@@ -12,6 +12,7 @@
   --status-text: #8c6819; 
 }
 
+/* El asterisco aplica esto a todos los elementos */
 * { 
   box-sizing: border-box; 
   margin: 0; 
@@ -157,10 +158,26 @@ input:focus, select:focus, textarea:focus {
   background: var(--primary-hover);
 }
 
+/* --- RESPONSIVIDAD PARA TELÉFONOS --- */
 @media (max-width: 768px) {
+  /* Apila los paneles en lugar de usar columnas */
   .layout-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  /* El formulario sube (1) y el historial baja (2) */
+  .panel-right { order: 1; }
+  .panel-left { order: 2; }
+
+  /* Los campos que estaban uno al lado del otro ahora ocupan todo el ancho */
+  .form-row {
     grid-template-columns: 1fr;
   }
-  .panel-left { order: 2; }
-  .panel-right { order: 1; }
+
+  /* Ajusta los márgenes exteriores para pantallas pequeñas */
+  body {
+    padding: 20px 10px;
+  }
 }
