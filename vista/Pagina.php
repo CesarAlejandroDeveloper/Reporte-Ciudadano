@@ -6,15 +6,19 @@
   <title>CiudadReporta - Obras Públicas</title>
   <style>
     :root {
-      --bg: #f4f7fb;
-      --panel: #ffffff;
-      --primary: #1f6feb;
-      --primary-hover: #155bc2;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --border: #e5e7eb;
-      --status-bg: #fffbeb;
-      --status-text: #b45309;
+      /* Paleta institucional basada en veracruz.gob.mx */
+      --bg: #f5f5f5; /* Gris muy claro para el fondo */
+      --panel: #ffffff; /* Blanco puro para los paneles */
+      --primary: #75203D; /* Guinda institucional */
+      --primary-hover: #5A172E; /* Guinda oscuro para hover */
+      --accent: #C9A15B; /* Dorado institucional */
+      --text: #333333; /* Texto oscuro */
+      --muted: #666666; /* Texto secundario */
+      --border: #d1d5db; /* Bordes sutiles */
+      
+      /* Colores para la etiqueta de estado */
+      --status-bg: #fdf3e1; /* Fondo dorado muy claro */
+      --status-text: #8c6819; /* Texto dorado oscuro */
     }
 
     * { 
@@ -25,7 +29,7 @@
 
     body {
       font-family: Arial, Helvetica, sans-serif;
-      background: linear-gradient(135deg, #eef4ff, var(--bg));
+      background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       padding: 40px 20px;
@@ -43,9 +47,10 @@
     .panel {
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-radius: 12px;
       padding: 24px;
-      box-shadow: 0 12px 30px rgba(31, 111, 235, 0.08);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+      border-top: 4px solid var(--primary); /* Acento guinda en el borde superior */
     }
 
     h2 {
@@ -76,9 +81,10 @@
 
     .report-card {
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 8px;
       padding: 16px;
       background: #fafafa;
+      border-left: 4px solid var(--accent); /* Acento dorado en las tarjetas */
     }
 
     .report-date {
@@ -110,6 +116,7 @@
       font-weight: 600;
       margin-bottom: 8px;
       font-size: 0.95rem;
+      color: var(--text);
     }
 
     input[type="text"],
@@ -119,7 +126,7 @@
       width: 100%;
       padding: 12px;
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 6px;
       font-family: inherit;
       background: #fff;
     }
@@ -131,8 +138,8 @@
 
     input:focus, select:focus, textarea:focus {
       outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.1);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(201, 161, 91, 0.2); /* Sombra dorada al enfocar */
     }
 
     /* Fila para agrupar campos */
@@ -149,7 +156,7 @@
       background: var(--primary);
       color: #fff;
       border: none;
-      border-radius: 10px;
+      border-radius: 6px;
       font-weight: 600;
       font-size: 1rem;
       cursor: pointer;
@@ -166,7 +173,6 @@
         grid-template-columns: 1fr;
       }
       
-      /* Opcional: Invertir el orden visual para que el formulario aparezca primero en móviles */
       .panel-left {
         order: 2;
       }
@@ -222,14 +228,13 @@
 
           <div class="form-group">
             <label for="ubicacion">Ubicación exacta</label>
-            <!-- Aquí más adelante puedes inyectar las coordenadas GPS con JavaScript -->
             <input type="text" id="ubicacion" name="ubicacion" placeholder="Ej: Calle 5 esquina con Av. Principal" required>
           </div>
         </div>
 
         <div class="form-group">
           <label for="descripcion">Descripción del problema</label>
-          <textarea id="descripcion" name="descripcion" placeholder="Describe brevemente el problema para que las cuadrillas sepan qué equipo llevar..."></textarea>
+          <textarea id="descripcion" name="descripcion" placeholder="Describe brevemente el problema..."></textarea>
         </div>
 
         <div class="form-group">
