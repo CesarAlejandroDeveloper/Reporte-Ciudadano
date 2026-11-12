@@ -1,3 +1,19 @@
+<?php
+/**
+ * Vista de Inicio de Sesión Administrativo - CiudadReporta
+ *
+ * Verifica si ya existe una sesión activa para redirigir directamente al panel
+ * administrativo (Admin.php) y proporciona el formulario de autenticación con
+ * manejo de errores y visualización opcional de contraseña.
+ *
+ * @package CiudadReporta\Vista
+ */
+session_start();
+if (isset($_SESSION['admin_id']) && intval($_SESSION['admin_id']) > 0) {
+    header('Location: Admin.php');
+    exit();
+}
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -7,153 +23,292 @@
   <link rel="stylesheet" href="../CSS/styles.css" />
   <style>
     body {
+      margin: 0;
+      min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
-      background-color: #f3f4f6;
+      background: #f3f4f6;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
       padding: 16px;
-    }
-    .login-card {
-      background: var(--panel, #ffffff);
-      width: 100%;
-      max-width: 420px;
-      padding: 32px 24px;
-      border-radius: 12px;
-      border: 1px solid var(--border, #e5e7eb);
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
-    }
-    .login-header {
-      text-align: center;
-      margin-bottom: 24px;
-    }
-    .login-header h1 {
-      color: var(--primary, #691c32);
-      font-size: 1.6rem;
-      margin: 0 0 6px 0;
-    }
-    .login-header p {
-      color: var(--muted, #6b7280);
-      font-size: 0.9rem;
-      margin: 0;
-    }
-    .form-group {
-      margin-bottom: 18px;
-    }
-    .form-group label {
-      display: block;
-      font-weight: 600;
-      font-size: 0.9rem;
-      color: var(--text, #374151);
-      margin-bottom: 6px;
-    }
-    .input-login {
-      width: 100%;
-      padding: 12px 14px;
-      font-size: 1rem;
-      border: 1px solid var(--border, #d1d5db);
-      border-radius: 8px;
       box-sizing: border-box;
     }
-    .input-login:focus {
-      outline: 2px solid var(--primary, #691c32);
-      border-color: transparent;
-    }
-    .btn-login {
+
+    .login-card {
       width: 100%;
-      padding: 14px;
-      font-size: 1rem;
-      font-weight: 700;
-      background: var(--primary, #691c32);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-top: 8px;
+      max-width: 410px;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 32px 28px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
     }
-    .btn-login:active {
-      opacity: 0.9;
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 22px;
     }
-    .error-box {
+
+    .login-header h1 {
+      margin: 0 0 6px;
+      color: var(--primary, #691c32);
+      font-size: 1.7rem;
+      font-weight: 800;
+    }
+
+    .login-header p {
+      margin: 0;
+      color: #6b7280;
+      font-size: 0.92rem;
+    }
+
+    .alerta-login {
       display: none;
       background: #fee2e2;
-      color: #991b1b;
+      color: #b91c1c;
       border: 1px solid #fca5a5;
-      padding: 10px 14px;
-      border-radius: 8px;
+      border-radius: 10px;
+      padding: 12px 14px;
       font-size: 0.88rem;
-      margin-bottom: 18px;
       text-align: center;
+      margin-bottom: 18px;
+      line-height: 1.4;
+    }
+
+    .alerta-login.visible {
+      display: block;
+    }
+
+    .campo-grupo {
+      margin-bottom: 16px;
+    }
+
+    .campo-grupo label {
+      display: block;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: #1f2937;
+      margin-bottom: 6px;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .campo-input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid #d1d5db;
+      border-radius: 9px;
+      font-size: 0.96rem;
+      color: #111827;
+      background: #ffffff;
+      box-sizing: border-box;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .campo-input:focus {
+      outline: none;
+      border-color: var(--primary, #691c32);
+      box-shadow: 0 0 0 3px rgba(105, 28, 50, 0.14);
+    }
+
+    .btn-ver-pass {
+      position: absolute;
+      right: 10px;
+      background: transparent;
+      border: none;
+      color: #6b7280;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 4px 6px;
+    }
+
+    .btn-ver-pass:hover {
+      color: var(--primary, #691c32);
+    }
+
+    .btn-entrar {
+      width: 100%;
+      padding: 12px;
+      margin-top: 6px;
+      background: var(--primary, #691c32);
+      color: #ffffff;
+      border: none;
+      border-radius: 9px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s ease, opacity 0.15s ease;
+    }
+
+    .btn-entrar:hover:not(:disabled) {
+      background: #521426;
+    }
+
+    .btn-entrar:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .login-footer {
+      text-align: center;
+      margin-top: 18px;
+    }
+
+    .login-footer a {
+      color: #6b7280;
+      text-decoration: none;
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+
+    .login-footer a:hover {
+      color: var(--primary, #691c32);
     }
   </style>
 </head>
 <body>
-  <div class="login-card">
+  <main class="login-card">
     <div class="login-header">
       <h1>CiudadReporta</h1>
       <p>Acceso al Panel de Administración</p>
     </div>
 
-    <div id="mensajeError" class="error-box"></div>
+    <div id="alertaLogin" class="alerta-login" role="alert"></div>
 
-    <form id="formularioLogin">
-      <div class="form-group">
+    <form id="formLoginAdmin" novalidate>
+      <div class="campo-grupo">
         <label for="usuario">Nombre o Correo electrónico</label>
-        <input type="text" id="usuario" name="usuario" class="input-login" placeholder="Ej: admin o admin@ciudadreporta.gob.mx" required autocomplete="username">
+        <input
+          type="text"
+          id="usuario"
+          name="usuario"
+          class="campo-input"
+          placeholder="admin@ciudadreporta.gob.mx"
+          autocomplete="username"
+          required
+        />
       </div>
 
-      <div class="form-group">
+      <div class="campo-grupo">
         <label for="contrasena">Contraseña</label>
-        <input type="password" id="contrasena" name="contrasena" class="input-login" placeholder="••••••••" required autocomplete="current-password">
+        <div class="input-wrapper">
+          <input
+            type="password"
+            id="contrasena"
+            name="contrasena"
+            class="campo-input"
+            style="padding-right: 68px;"
+            placeholder="••••••••"
+            autocomplete="current-password"
+            required
+          />
+          <button type="button" id="btnTogglePass" class="btn-ver-pass">Mostrar</button>
+        </div>
       </div>
 
-      <button type="submit" class="btn-login" id="btnSubmit">Iniciar Sesión</button>
+      <button type="submit" id="btnIniciarSesion" class="btn-entrar">
+        Iniciar Sesión
+      </button>
     </form>
 
-    <div style="text-align: center; margin-top: 20px;">
-      <a href="Pagina.php" style="color: var(--muted, #6b7280); font-size: 0.85rem; text-decoration: none;">← Volver al portal ciudadano</a>
+    <div class="login-footer">
+      <a href="Home.php">← Volver al portal ciudadano</a>
     </div>
-  </div>
+  </main>
 
   <script>
-    const API_LOGIN = '../index.php/api/login';
+    /**
+     * Controla el envío del formulario de autenticación hacia el endpoint /api/login
+     * y redirige al panel de administración cuando las credenciales son válidas.
+     */
+    (function () {
+      const API_LOGIN = '../index.php/api/login';
 
-    document.getElementById('formularioLogin').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const usuario = document.getElementById('usuario').value.trim();
-      const contrasena = document.getElementById('contrasena').value.trim();
-      const mensajeError = document.getElementById('mensajeError');
-      const btnSubmit = document.getElementById('btnSubmit');
+      const form       = document.getElementById('formLoginAdmin');
+      const inputUser  = document.getElementById('usuario');
+      const inputPass  = document.getElementById('contrasena');
+      const btnSubmit  = document.getElementById('btnIniciarSesion');
+      const btnToggle  = document.getElementById('btnTogglePass');
+      const alertaBox  = document.getElementById('alertaLogin');
 
-      mensajeError.style.display = 'none';
-      btnSubmit.disabled = true;
-      btnSubmit.innerText = 'Verificando...';
-
-      try {
-        const respuesta = await fetch(API_LOGIN, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ usuario, contrasena })
-        });
-
-        const resultado = await respuesta.json();
-
-        if (respuesta.ok) {
-          window.location.href = 'Admin.php';
-        } else {
-          mensajeError.innerText = resultado.error || 'Error al iniciar sesión.';
-          mensajeError.style.display = 'block';
-        }
-      } catch (error) {
-        console.error("Error al iniciar sesión:", error);
-        mensajeError.innerText = 'No se pudo conectar con el servidor.';
-        mensajeError.style.display = 'block';
-      } finally {
-        btnSubmit.disabled = false;
-        btnSubmit.innerText = 'Iniciar Sesión';
+      /**
+       * Muestra un mensaje de error en la tarjeta de inicio de sesión.
+       * @param {string} mensaje Texto descriptivo del error.
+       */
+      function mostrarError(mensaje) {
+        alertaBox.textContent = mensaje;
+        alertaBox.classList.add('visible');
       }
-    });
+
+      /**
+       * Oculta el banner de alerta.
+       */
+      function ocultarError() {
+        alertaBox.textContent = '';
+        alertaBox.classList.remove('visible');
+      }
+
+      // Alternar visibilidad de la contraseña
+      btnToggle.addEventListener('click', () => {
+        const esPassword = inputPass.type === 'password';
+        inputPass.type = esPassword ? 'text' : 'password';
+        btnToggle.textContent = esPassword ? 'Ocultar' : 'Mostrar';
+      });
+
+      // Envío de credenciales
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        ocultarError();
+
+        const usuario    = inputUser.value.trim();
+        const contrasena = inputPass.value;
+
+        if (!usuario || !contrasena) {
+          mostrarError('Por favor ingresa tu nombre o correo y tu contraseña.');
+          return;
+        }
+
+        btnSubmit.disabled = true;
+        btnSubmit.textContent = 'Verificando...';
+
+        try {
+          const respuesta = await fetch(API_LOGIN, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({ usuario, contrasena })
+          });
+
+          const rawText = await respuesta.text();
+          let data;
+          try {
+            data = JSON.parse(rawText);
+          } catch (_) {
+            throw new Error('Respuesta inesperada del servidor.');
+          }
+
+          if (respuesta.ok) {
+            window.location.href = 'Admin.php';
+            return;
+          }
+
+          mostrarError(data.error || 'Credenciales incorrectas. Verifica tu usuario/correo y contraseña.');
+        } catch (error) {
+          mostrarError(error.message || 'No se pudo conectar con el servidor.');
+        } finally {
+          btnSubmit.disabled = false;
+          btnSubmit.textContent = 'Iniciar Sesión';
+        }
+      });
+    })();
   </script>
 </body>
 </html>

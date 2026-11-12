@@ -9,8 +9,8 @@ define('DB_PASS', '');
 define('API_ADMIN_TOKEN', 'cr_v3r4cruz_9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c');
 
 // Control de publicaciones por dispositivo y zona (habilitado para Mapa de Calor)
-define('COOLDOWN_SEGUNDOS_DISPOSITIVO', 3);       // Espera mínima entre envíos (evita doble clic)
-define('MAX_REPORTES_POR_HORA_DISPOSITIVO', 50);  // Publicaciones permitidas por hora desde un dispositivo
+define('COOLDOWN_SEGUNDOS_DISPOSITIVO', 2);       // Espera mínima entre envíos (evita doble clic)
+define('MAX_REPORTES_POR_HORA_DISPOSITIVO', 150);  // Publicaciones permitidas por hora desde un dispositivo
 define('BLOQUEAR_DUPLICADOS_ZONA', false);        // false = permite acumular reportes en una misma zona
 
 // Vocabulario unificado en todo el sistema

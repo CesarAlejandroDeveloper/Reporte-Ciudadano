@@ -2,269 +2,477 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Detalle de Reporte - CiudadReporta</title>
   <link rel="stylesheet" href="../CSS/styles.css" />
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
   <style>
-    .detalle-container { max-width: 800px; margin: 0 auto; }
-    .header-detalle { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
-    .dato-grupo { margin-bottom: 20px; }
-    .dato-label { font-weight: 600; color: var(--primary); font-size: 0.95rem; margin-bottom: 4px; display: block; }
-    .dato-valor {
-      font-size: 1.05rem;
-      color: var(--text);
-      background: #fafafa;
-      padding: 12px;
+    .detalle-wrapper {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .detalle-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      margin-bottom: 22px;
+      border-bottom: 2px solid var(--border, #e5e7eb);
+    }
+    .detalle-header h1 {
+      margin: 0;
+      color: var(--primary, #691c32);
+      font-size: 1.5rem;
+    }
+    .header-acciones {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn-nav {
+      display: inline-block;
+      padding: 8px 14px;
       border-radius: 6px;
-      border: 1px solid var(--border);
+      background: #f3f4f6;
+      color: #1f2937;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+      border: 1px solid #d1d5db;
+    }
+    .btn-nav-primary {
+      background: var(--primary, #691c32);
+      color: #ffffff;
+      border-color: var(--primary, #691c32);
+    }
+
+    /* Cartel de estado final (Resuelto / Dado de baja) */
+    .cartel-estado {
+      display: none;
+      padding: 14px 18px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      font-weight: 700;
+      font-size: 0.98rem;
+    }
+    .cartel-resuelto {
+      display: block;
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #86efac;
+      border-left: 6px solid #16a34a;
+    }
+    .cartel-baja {
+      display: block;
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+      border-left: 6px solid #dc2626;
+    }
+
+    .card-bloque {
+      background: var(--panel, #ffffff);
+      border: 1px solid var(--border, #e5e7eb);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+    }
+    .card-bloque h2 {
+      margin: 0 0 14px;
+      font-size: 1.12rem;
+      color: var(--primary, #691c32);
+      border-bottom: 1px solid var(--border, #e5e7eb);
+      padding-bottom: 8px;
+    }
+
+    /* Línea de tiempo */
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 8px;
+    }
+    @media (max-width: 720px) {
+      .timeline {
+        grid-template-columns: 1fr;
+      }
+    }
+    .paso-tl {
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+      border-radius: 10px;
+      padding: 12px;
+      position: relative;
+      opacity: 0.65;
+    }
+    .paso-tl.completado {
+      opacity: 1;
+      background: #fdf2f4;
+      border-color: var(--primary, #691c32);
+    }
+    .paso-tl.actual {
+      opacity: 1;
+      background: var(--primary, #691c32);
+      color: #ffffff;
+      border-color: var(--primary, #691c32);
+    }
+    .paso-tl strong {
+      display: block;
+      font-size: 0.92rem;
+      margin-bottom: 4px;
+    }
+    .paso-tl span {
+      font-size: 0.78rem;
+      opacity: 0.85;
+    }
+
+    .detalle-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 820px) {
+      .detalle-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .meta-lista {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .meta-item {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .meta-item span {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted, #6b7280);
+      font-weight: 600;
+    }
+    .meta-item strong {
+      font-size: 0.95rem;
+      color: var(--text, #111827);
+      text-transform: capitalize;
+    }
+    .descripcion-caja {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 0.94rem;
+      line-height: 1.55;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
       word-break: break-word;
     }
+    #mapaDetalle {
+      width: 100%;
+      height: 270px;
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
+    }
     .galeria-evidencias {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 12px;
-      margin-top: 10px;
     }
-    .foto-evidencia {
+    .galeria-evidencias img {
       width: 100%;
-      height: 220px;
+      height: 190px;
       object-fit: cover;
-      border-radius: 8px;
-      border: 1px solid var(--border);
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
       cursor: pointer;
+      transition: transform 0.15s ease;
     }
-    #contenedorResolucion { display: none; }
-    .btn-volver { text-align: center; display: block; margin-top: 30px; background: var(--muted); }
-    .btn-volver:hover { background: #4b5563; }
-    .stepper-wrapper { margin: 40px 0 20px; }
-    .stepper-container { display: flex; justify-content: space-between; position: relative; }
-    .stepper-container::before { content: ''; position: absolute; top: 15px; left: 10%; width: 80%; height: 4px; background: var(--border); z-index: 1; }
-    .stepper-progress { position: absolute; top: 15px; left: 10%; height: 4px; background: var(--primary); z-index: 2; transition: width 0.4s ease; width: 0%; }
-    .step { position: relative; z-index: 3; text-align: center; width: 25%; }
-    .step-circle { width: 34px; height: 34px; background: var(--panel); border: 4px solid var(--border); border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: transparent; transition: all 0.3s; }
-    .step-label { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
-    .step.active .step-circle, .step.completed .step-circle { border-color: var(--primary); background: var(--primary); color: white; }
-    .step.active .step-label { color: var(--primary); }
-    .cartel-final { display: none; text-align: center; padding: 30px; border-radius: 12px; margin: 40px 0 20px; font-size: 1.8rem; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
-    .cartel-resuelto { background: #dcfce7; color: #166534; border: 3px solid #22c55e; }
-    .cartel-denegada { background: #fee2e2; color: #991b1b; border: 3px solid #ef4444; }
+    .galeria-evidencias img:hover {
+      transform: scale(1.02);
+    }
+    .error-pantalla {
+      text-align: center;
+      padding: 40px 20px;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+    }
   </style>
 </head>
 <body>
-  <main class="detalle-container">
-    <section class="panel">
-      <div class="header-detalle">
-        <h2 style="margin: 0;">Folio: <span id="folioID">Cargando...</span></h2>
-        <span id="badgeEstado" class="report-status">...</span>
+  <main class="detalle-wrapper">
+    <header class="detalle-header">
+      <div>
+        <h1 id="tituloFolio">Seguimiento de Reporte</h1>
+        <span id="subtituloFecha" style="color: var(--muted, #6b7280); font-size: 0.9rem;">
+          Consultando información...
+        </span>
       </div>
+      <div class="header-acciones">
+        <a href="Pagina.php" class="btn-nav btn-nav-primary">← Volver a reportes</a>
+        <a href="Home.php" class="btn-nav">Inicio</a>
+      </div>
+    </header>
 
-      <div class="form-row">
-        <div class="dato-grupo">
-          <span class="dato-label">Tipo de Incidencia / Categoría</span>
-          <div class="dato-valor" id="txtTipo" style="text-transform: capitalize;">...</div>
+    <div id="contenedorError" class="error-pantalla" style="display: none;">
+      <h2 style="color: #dc2626; margin-top: 0;">No se pudo abrir el reporte</h2>
+      <p id="mensajeErrorDetalle" style="color: #4b5563;"></p>
+      <a href="Pagina.php" class="btn-nav btn-nav-primary">Ir al portal de reportes</a>
+    </div>
+
+    <div id="contenidoReporte" style="display: none;">
+      <div id="cartelEstado" class="cartel-estado"></div>
+
+      <!-- LÍNEA DE TIEMPO -->
+      <section class="card-bloque">
+        <h2>Línea de Tiempo del Seguimiento</h2>
+        <div class="timeline" id="lineaTiempo">
+          <div class="paso-tl" data-paso="reporte recibido">
+            <strong>1. Reporte Recibido</strong>
+            <span>Registrado en plataforma</span>
+          </div>
+          <div class="paso-tl" data-paso="en revision">
+            <strong>2. En Revisión</strong>
+            <span>Validación por área técnica</span>
+          </div>
+          <div class="paso-tl" data-paso="en proceso">
+            <strong>3. En Proceso</strong>
+            <span>Cuadrilla asignada en atención</span>
+          </div>
+          <div class="paso-tl" data-paso="resuelto">
+            <strong>4. Resuelto</strong>
+            <span>Incidencia atendida y cerrada</span>
+          </div>
         </div>
-        <div class="dato-grupo">
-          <span class="dato-label">Fecha de Creación</span>
-          <div class="dato-valor" id="txtFechaLevantamiento">...</div>
-        </div>
+      </section>
+
+      <!-- INFORMACIÓN Y MAPA -->
+      <div class="detalle-grid">
+        <section class="card-bloque">
+          <h2>Información del Reporte</h2>
+          <div class="meta-lista">
+            <div class="meta-item">
+              <span>Folio</span>
+              <strong id="detFolio" style="text-transform: uppercase;">-</strong>
+            </div>
+            <div class="meta-item">
+              <span>Categoría</span>
+              <strong id="detCategoria">-</strong>
+            </div>
+            <div class="meta-item">
+              <span>Prioridad</span>
+              <strong id="detPrioridad">-</strong>
+            </div>
+            <div class="meta-item">
+              <span>Estatus Actual</span>
+              <strong id="detEstatus">-</strong>
+            </div>
+          </div>
+
+          <label style="display:block; font-weight:700; font-size:0.88rem; color:var(--primary,#691c32); margin-bottom:6px;">
+            Título y Descripción
+          </label>
+          <div class="descripcion-caja" id="detDescripcion"></div>
+        </section>
+
+        <section class="card-bloque">
+          <h2>Ubicación Reportada</h2>
+          <div id="mapaDetalle"></div>
+          <p id="textoCoords" style="margin: 8px 0 0; font-size: 0.84rem; color: var(--muted, #6b7280);"></p>
+        </section>
       </div>
 
-      <div class="dato-grupo" id="contenedorResolucion">
-        <span class="dato-label" style="color: #15803d;">Fecha de Resolución</span>
-        <div class="dato-valor" id="txtFechaResolucion" style="background: #f0fdf4; border-color: #bbf7d0;">...</div>
-      </div>
-
-      <div class="dato-grupo">
-        <span class="dato-label">Descripción y Ubicación del Problema</span>
-        <div class="dato-valor" id="txtDescripcion">...</div>
-      </div>
-
-      <div class="dato-grupo">
-        <span class="dato-label">Mapa de Ubicación del Incidente</span>
-        <div id="mapaDetalle" style="height: 280px; width: 100%; border-radius: 8px; border: 1px solid var(--border); margin-top: 6px;"></div>
-      </div>
-
-      <div class="dato-grupo">
-        <span class="dato-label">Evidencia Fotográfica</span>
-        <div id="contenedorGaleriaEvidencias" class="galeria-evidencias"></div>
-      </div>
-
-      <div class="stepper-wrapper" id="bloqueLineaTiempo">
-        <div class="stepper-container">
-          <div class="stepper-progress" id="barraProgreso"></div>
-          <div class="step" id="step-0"><div class="step-circle"></div><div class="step-label">Reporte Recibido</div></div>
-          <div class="step" id="step-1"><div class="step-circle"></div><div class="step-label">En revisión</div></div>
-          <div class="step" id="step-2"><div class="step-circle"></div><div class="step-label">En proceso</div></div>
-          <div class="step" id="step-3"><div class="step-circle"></div><div class="step-label">Resuelto</div></div>
-        </div>
-      </div>
-
-      <div id="cartelResuelto" class="cartel-final cartel-resuelto">REPORTE RESUELTO</div>
-      <div id="cartelDenegada" class="cartel-final cartel-denegada">REPORTE DENEGADO</div>
-
-      <a href="Pagina.php" class="btn btn-volver">Volver al inicio</a>
-    </section>
+      <!-- GALERÍA DE EVIDENCIAS -->
+      <section class="card-bloque">
+        <h2>Evidencia Fotográfica</h2>
+        <div id="galeriaEvidencias" class="galeria-evidencias"></div>
+      </section>
+    </div>
   </main>
 
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const reporteID = urlParams.get('id');
+    const API_REPORTES = '../index.php/api/reportes';
 
     function obtenerListaFotos(fotoUrl) {
       if (!fotoUrl) return [];
       let lista = [];
       if (typeof fotoUrl === 'string' && fotoUrl.trim().startsWith('[')) {
-        try { lista = JSON.parse(fotoUrl); } catch (_) { lista = [fotoUrl]; }
+        try {
+          lista = JSON.parse(fotoUrl);
+        } catch (_) {
+          lista = [fotoUrl];
+        }
       } else if (Array.isArray(fotoUrl)) {
         lista = fotoUrl;
       } else {
         lista = [fotoUrl];
       }
-      return lista.filter(Boolean).map(u => {
-        if (u.startsWith('http') || u.startsWith('../')) return u;
-        if (u.startsWith('api/')) return '../../' + u;
-        return '../' + u;
+
+      return lista.filter(Boolean).map(ruta => {
+        if (ruta.startsWith('http') || ruta.startsWith('../')) return ruta;
+        if (ruta.startsWith('api/')) return '../../' + ruta;
+        return '../' + ruta;
       });
     }
 
-    function renderizarMapa(lat, lng) {
-      const mapa = new maplibregl.Map({
-        container: 'mapaDetalle',
-        style: {
-          version: 8,
-          sources: {
-            'osm-tiles': {
-              type: 'raster',
-              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-              tileSize: 256,
-              attribution: '&copy; OpenStreetMap contributors'
-            }
-          },
-          layers: [{ id: 'osm-tiles', type: 'raster', source: 'osm-tiles', minzoom: 10, maxzoom: 19 }]
-        },
-        center: [lng, lat],
-        zoom: 16
-      });
-
-      mapa.addControl(new maplibregl.NavigationControl());
-      new maplibregl.Marker({ color: '#e11d48' }).setLngLat([lng, lat]).addTo(mapa);
+    function mostrarPantallaError(mensaje) {
+      document.getElementById('contenidoReporte').style.display = 'none';
+      document.getElementById('contenedorError').style.display = 'block';
+      document.getElementById('mensajeErrorDetalle').textContent = mensaje;
     }
 
-    async function buscarUbicacionYRenderizar(textoUbicacion) {
-      const centroVeracruz = [19.1738, -96.1348];
-      try {
-        let query = textoUbicacion.split('\n')[0].replace('Ubicación:', '').trim();
-        if (!query.toLowerCase().includes('veracruz')) {
-          query += ', Veracruz';
-        }
+    function actualizarLineaTiempo(estatusActual, historial) {
+      const orden = ['reporte recibido', 'en revision', 'en proceso', 'resuelto'];
+      const st = (estatusActual || 'reporte recibido').toLowerCase();
+      const indiceActual = orden.indexOf(st);
 
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=mx&bounded=1&viewbox=-96.35,19.30,-96.00,19.00`;
-        const res = await fetch(url);
-        const resultados = await res.json();
-
-        if (resultados && resultados.length > 0) {
-          renderizarMapa(parseFloat(resultados[0].lat), parseFloat(resultados[0].lon));
-        } else {
-          renderizarMapa(centroVeracruz[0], centroVeracruz[1]);
-        }
-      } catch (err) {
-        renderizarMapa(centroVeracruz[0], centroVeracruz[1]);
+      const fechasPorEstatus = {};
+      if (Array.isArray(historial)) {
+        historial.forEach(item => {
+          const clave = (item.estatus || '').toLowerCase();
+          if (clave && item.creado) {
+            fechasPorEstatus[clave] = item.creado;
+          }
+        });
       }
+
+      document.querySelectorAll('#lineaTiempo .paso-tl').forEach((pasoEl, idx) => {
+        const clavePaso = pasoEl.dataset.paso;
+        pasoEl.classList.remove('completado', 'actual');
+
+        if (indiceActual !== -1) {
+          if (idx < indiceActual) {
+            pasoEl.classList.add('completado');
+          } else if (idx === indiceActual) {
+            pasoEl.classList.add('actual');
+          }
+        }
+
+        if (fechasPorEstatus[clavePaso]) {
+          const span = pasoEl.querySelector('span');
+          if (span) span.textContent = fechasPorEstatus[clavePaso];
+        }
+      });
     }
 
-    document.addEventListener("DOMContentLoaded", async () => {
-      if (!reporteID) {
-        alert("No se especificó ningún reporte.");
+    async function cargarDetalleReporte() {
+      const params = new URLSearchParams(window.location.search);
+      const folio = (params.get('folio') || '').trim();
+      const id = (params.get('id') || '').trim();
+
+      if (!folio && !id) {
+        mostrarPantallaError('No se especificó ningún folio o identificador de reporte en la URL.');
         return;
       }
 
+      const queryUrl = folio
+        ? `${API_REPORTES}?folio=${encodeURIComponent(folio)}`
+        : `${API_REPORTES}?id=${encodeURIComponent(id)}`;
+
       try {
-        const respuesta = await fetch(`../index.php/api/reportes?id=${encodeURIComponent(reporteID)}`);
-        const datosNube = await respuesta.json();
+        const res = await fetch(queryUrl);
+        const data = await res.json();
 
-        if (datosNube.error) {
-          alert(datosNube.error);
+        if (!res.ok || !data || data.error) {
+          mostrarPantallaError(data.error || 'El reporte solicitado no existe o no está disponible.');
           return;
         }
 
-        document.getElementById('folioID').textContent = datosNube.folio || ("#" + datosNube.id);
-        document.getElementById('badgeEstado').textContent = datosNube.estatus;
-        document.getElementById('txtTipo').textContent = datosNube.categoria;
-        document.getElementById('txtDescripcion').textContent = datosNube.descripcion || 'Sin descripción';
-        document.getElementById('txtFechaLevantamiento').textContent = datosNube.fecha_creacion;
+        document.getElementById('contenidoReporte').style.display = 'block';
 
-        if (datosNube.latitud && datosNube.longitud) {
-          renderizarMapa(parseFloat(datosNube.latitud), parseFloat(datosNube.longitud));
-        } else {
-          buscarUbicacionYRenderizar(datosNube.descripcion || datosNube.titulo || 'Veracruz');
+        const folioTexto = data.folio || ('#' + data.id);
+        const estatus = (data.estatus || 'reporte recibido').toLowerCase();
+
+        document.getElementById('tituloFolio').textContent = `Reporte ${folioTexto}`;
+        document.getElementById('subtituloFecha').textContent = `Registrado el: ${data.fecha_creacion || 'Fecha no disponible'}`;
+
+        document.getElementById('detFolio').textContent = folioTexto;
+        document.getElementById('detCategoria').textContent = data.categoria || 'Otro';
+        document.getElementById('detPrioridad').textContent = data.prioridad || 'Media';
+        document.getElementById('detEstatus').textContent = estatus === 'denegada' ? 'Dado de baja' : estatus;
+
+        const descCompleta = data.titulo && !(data.descripcion || '').includes(data.titulo)
+          ? `${data.titulo}\n\n${data.descripcion || ''}`
+          : (data.descripcion || data.titulo || 'Sin descripción.');
+        document.getElementById('detDescripcion').textContent = descCompleta;
+
+        // Cartel si está resuelto o dado de baja
+        const cartel = document.getElementById('cartelEstado');
+        if (estatus === 'resuelto') {
+          cartel.className = 'cartel-estado cartel-resuelto';
+          cartel.textContent = '✅ Reporte Resuelto: Esta incidencia ya fue atendida por el área correspondiente.';
+        } else if (estatus === 'denegada' || estatus === 'cancelado') {
+          cartel.className = 'cartel-estado cartel-baja';
+          cartel.textContent = '⚠️ Reporte Dado de Baja: Este reporte fue cerrado o descartado por el administrador.';
         }
 
-        const galeria = document.getElementById('contenedorGaleriaEvidencias');
-        const fotos = obtenerListaFotos(datosNube.foto_url);
-        if (fotos.length > 0) {
-          fotos.forEach((src, i) => {
-            const img = document.createElement('img');
-            img.src = src;
-            img.alt = `Evidencia ${i + 1}`;
-            img.className = 'foto-evidencia';
-            img.onclick = () => window.open(src, '_blank', 'noopener');
-            galeria.appendChild(img);
-          });
-        } else {
-          galeria.innerHTML = '<span style="color: var(--muted); font-size: 0.9rem;">Sin fotografías adjuntas</span>';
-        }
+        actualizarLineaTiempo(estatus, data.historial || []);
 
-        const lineaTiempo = document.getElementById('bloqueLineaTiempo');
-        const cartelResuelto = document.getElementById('cartelResuelto');
-        const cartelDenegada = document.getElementById('cartelDenegada');
-        const barraProgreso = document.getElementById('barraProgreso');
+        // Mapa
+        const centroVeracruz = [-96.1348, 19.1738];
+        const tieneCoords = data.latitud && data.longitud && !isNaN(parseFloat(data.latitud)) && !isNaN(parseFloat(data.longitud));
+        const coords = tieneCoords
+          ? [parseFloat(data.longitud), parseFloat(data.latitud)]
+          : centroVeracruz;
 
-        const estatusLower = (datosNube.estatus || '').toLowerCase();
+        document.getElementById('textoCoords').textContent = tieneCoords
+          ? `Coordenadas: ${parseFloat(data.latitud).toFixed(6)}, ${parseFloat(data.longitud).toFixed(6)}`
+          : 'Este reporte no cuenta con coordenadas GPS exactas; se muestra el centro de Veracruz.';
 
-        if (estatusLower === 'denegada' || estatusLower === 'cancelado') {
-          lineaTiempo.style.display = 'none';
-          cartelDenegada.style.display = 'block';
-          let badge = document.getElementById('badgeEstado');
-          badge.style.background = "#fee2e2";
-          badge.style.color = "#991b1b";
-          return;
-        }
-
-        if (estatusLower === 'resuelto') {
-          lineaTiempo.style.display = 'none';
-          cartelResuelto.style.display = 'block';
-          let badge = document.getElementById('badgeEstado');
-          badge.style.background = "#dcfce7";
-          badge.style.color = "#166534";
-          return;
-        }
-
-        const estadosProceso = ["reporte recibido", "en revision", "en proceso", "resuelto"];
-        const pasoActual = estadosProceso.indexOf(estatusLower);
-
-        if (pasoActual >= 0) {
-          const porcentajes = ["0%", "33%", "66%", "100%"];
-          barraProgreso.style.width = porcentajes[pasoActual];
-
-          for (let i = 0; i <= pasoActual; i++) {
-            const circulo = document.getElementById(`step-${i}`);
-            if (circulo) {
-              if (i === pasoActual) {
-                circulo.classList.add('active');
-              } else {
-                circulo.classList.add('completed');
+        const mapa = new maplibregl.Map({
+          container: 'mapaDetalle',
+          style: {
+            version: 8,
+            sources: {
+              'osm-tiles': {
+                type: 'raster',
+                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                tileSize: 256
               }
-            }
-          }
+            },
+            layers: [{ id: 'osm-tiles', type: 'raster', source: 'osm-tiles', minzoom: 10, maxzoom: 19 }]
+          },
+          center: coords,
+          zoom: tieneCoords ? 16 : 13
+        });
+
+        if (tieneCoords) {
+          new maplibregl.Marker({ color: '#691c32' }).setLngLat(coords).addTo(mapa);
         }
-      } catch (error) {
-        console.error("Error al obtener los datos del reporte:", error);
+
+        // Galería de fotos
+        const galeria = document.getElementById('galeriaEvidencias');
+        const fotos = obtenerListaFotos(data.foto_url);
+        if (fotos.length > 0) {
+          galeria.innerHTML = fotos.map((src, i) => `
+            <img src="${src}" alt="Evidencia ${i + 1}" onclick="window.open('${src}', '_blank', 'noopener')" />
+          `).join('');
+        } else {
+          galeria.innerHTML = '<p style="color: var(--muted, #6b7280);">Este reporte no tiene fotografías adjuntas.</p>';
+        }
+
+      } catch (err) {
+        console.error('Error cargando detalle:', err);
+        mostrarPantallaError('Error de conexión con el servidor al consultar el reporte.');
       }
-    });
+    }
+
+    document.addEventListener('DOMContentLoaded', cargarDetalleReporte);
   </script>
+
+  <?php
+  $widgetIA = __DIR__ . '/chat_ia.php';
+  if (file_exists($widgetIA)) {
+      include $widgetIA;
+  }
+  ?>
 </body>
 </html>
