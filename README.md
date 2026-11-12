@@ -102,6 +102,31 @@ En cumplimiento con las buenas prácticas de desarrollo de software y transparen
      * Estructuración de la documentación técnica del proyecto.
    * **Supervisión humana:** Todas las decisiones de arquitectura, diseño de interfaz, reglas de negocio, pruebas funcionales en entorno local y validación final del código fueron realizadas, verificadas e integradas por el equipo de desarrollo.
 
+## Problema que Resuelve
+En la zona conurbada de Heroica Veracruz, el reporte de incidencias urbanas (baches, luminarias fundidas, fugas de agua o acumulación de basura) suele carecer de canales centralizados, ubicación geográfica exacta y mecanismos transparentes de seguimiento. Esto provoca reportes duplicados, falta de evidencia visual, incidencias registradas con coordenadas erróneas y desconocimiento ciudadano sobre si su solicitud fue atendida.
+
+## Personas Usuarias
+- **Ciudadanía general (Habitantes de Veracruz):** Personas que detectan una falla urbana en la vía pública y necesitan reportarla rápido desde su celular o computadora con ubicación exacta, fotos y un folio para dar seguimiento sin trámites presenciales complejos.
+- **Personal y Administradores Municipales:** Operadores encargados de validar evidencias, filtrar reportes duplicados o improcedentes, actualizar el estatus de atención y detectar zonas críticas mediante el mapa de calor.
+
+## Cómo se Usa
+
+### Flujo Ciudadano
+1. **Crear un reporte:** Ingresa al portal principal (`vista/Pagina.php`), selecciona la categoría de la incidencia (bache, fuga, luminaria, etc.) y marca el punto exacto en el mapa interactivo, usando el buscador de calles o el botón de GPS.
+2. **Adjuntar evidencia:** Sube de 1 a 3 fotografías de respaldo y envía el formulario.
+3. **Dar seguimiento:** Guarda el folio único generado (`RC-DDMMAA-XXXX`) e ingrésalo en la vista de consulta (`vista/Reporte.php`) para revisar la línea de tiempo de atención.
+4. **Asistencia con IA:** Haz clic en el botón flotante de **Respondin** para resolver dudas sobre trámites, consultar un folio por texto o levantar un reporte guiado.
+
+### Flujo Administrativo
+1. **Iniciar sesión:** Accede a `vista/Login.php` con las credenciales de administrador.
+2. **Gestionar incidencias:** Desde `vista/Admin.php`, filtra los reportes recibidos, revisa las fotografías adjuntas y cambia el estatus individualmente o mediante selección múltiple (`En revisión`, `En proceso`, `Resuelto` o `Dado de baja`).
+3. **Analizar zonas críticas:** Consulta el módulo de mapa de calor para identificar cuadrantes de 300 m con alta concentración de reportes.
+
+## Datos Utilizados
+- **Cartografía y Geocodificación:** Teselas vectoriales/ráster de **OpenStreetMap** renderizadas con **MapLibre GL JS** y servicio de geocodificación directa e inversa mediante la **API pública de Nominatim** para convertir direcciones en coordenadas.
+- **Delimitación Geográfica (Polígono Costero):** Coordenadas geográficas de referencia de la línea de costa y zona urbana de Heroica Veracruz utilizadas para validar matemáticamente que ningún reporte se registre sobre el Golfo de México.
+- **Datos de Prueba y Operación:** Registros sintéticos/simulados de incidencias urbanas en Veracruz para validar el funcionamiento del mapa de calor, el historial de estatus y las pruebas de carga. El sistema no recolecta ni almacena datos personales sensibles de los ciudadanos.
+
 ---
 
 ## Equipo de Desarrollo
