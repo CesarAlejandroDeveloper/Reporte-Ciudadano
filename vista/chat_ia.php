@@ -1,4 +1,4 @@
-<!-- Burbuja flotante de Asistente IA (Respondin) con Mapa y Geocodificación Automática -->
+<!-- Burbuja flotante de Asistente IA (Respondin) con Notas de Voz y Mapa -->
 <style>
   #iaFabBtn.ia-fab {
     position: fixed !important;
@@ -32,14 +32,13 @@
     box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.28);
     flex-shrink: 0;
   }
-
   #iaVentanaChat.ia-ventana {
     position: fixed !important;
     right: 20px !important;
     bottom: 82px !important;
     width: 380px !important;
     max-width: calc(100vw - 24px) !important;
-    height: 530px !important;
+    height: 560px !important;
     max-height: calc(100vh - 105px) !important;
     background: #ffffff !important;
     border: 1px solid #d1d5db !important;
@@ -54,7 +53,6 @@
   #iaVentanaChat.ia-ventana.abierta {
     display: flex !important;
   }
-
   .ia-header {
     background: var(--primary, #691c32);
     color: #ffffff;
@@ -94,7 +92,6 @@
   .ia-btn-head:hover {
     background: rgba(255, 255, 255, 0.3);
   }
-
   .ia-terminos {
     padding: 14px 16px;
     background: #fdf2f4;
@@ -115,7 +112,6 @@
     margin-top: 3px;
     accent-color: var(--primary, #691c32);
   }
-
   .ia-mensajes {
     flex: 1;
     overflow-y: auto;
@@ -162,7 +158,19 @@
     border-radius: 999px;
     text-align: center;
   }
-
+  .ia-audio-player {
+    display: block;
+    width: 220px;
+    max-width: 100%;
+    height: 34px;
+    margin-top: 4px;
+  }
+  .ia-transcripcion {
+    font-size: 0.8rem;
+    opacity: 0.85;
+    font-style: italic;
+    margin-top: 4px;
+  }
   /* Panel de Mini-Mapa dentro del Chat */
   .ia-mapa-overlay {
     display: none;
@@ -222,7 +230,6 @@
     font-weight: 600;
     cursor: pointer;
   }
-
   .ia-sugerencias {
     display: flex;
     gap: 6px;
@@ -247,11 +254,6 @@
     border-color: var(--primary, #691c32);
     color: var(--primary, #691c32);
   }
-  .ia-chip:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
   .ia-form {
     display: flex;
     align-items: center;
@@ -274,6 +276,11 @@
     border-color: var(--primary, #691c32);
     background: #fdf2f4;
     color: var(--primary, #691c32);
+  }
+  .ia-btn-mic.grabando {
+    background: #dc2626 !important;
+    color: #ffffff !important;
+    border-color: #dc2626 !important;
   }
   .ia-input {
     flex: 1;
@@ -301,37 +308,21 @@
     opacity: 0.55;
     cursor: not-allowed;
   }
-
-  @media (max-width: 480px) {
-    #iaFabBtn.ia-fab {
-      right: 12px !important;
-      bottom: 12px !important;
-      padding: 11px 14px !important;
-      font-size: 0.88rem !important;
-    }
-    #iaVentanaChat.ia-ventana {
-      right: 10px !important;
-      left: 10px !important;
-      bottom: 68px !important;
-      width: auto !important;
-      height: 76vh !important;
-    }
-  }
 </style>
 
 <button type="button" class="ia-fab" id="iaFabBtn" aria-label="Abrir asistente virtual">
   <span class="ia-fab-dot"></span>
-  <span>💬 ¿Dudas? Asistente IA</span>
+  <span>💬 Dudas? Asistente IA</span>
 </button>
 
 <div class="ia-ventana" id="iaVentanaChat" role="dialog" aria-label="Chat con Respondin">
   <div class="ia-header">
     <div class="ia-header-info">
-      <h3>Respondin · Asistente IA</h3>
-      <span>Dudas sobre reportes, trámites y folios</span>
+      <h3>Respondin – Asistente IA</h3>
+      <span>Voz, reportes, trámites y folios</span>
     </div>
     <div class="ia-header-acciones">
-      <button type="button" class="ia-btn-head" id="iaBtnReiniciar" title="Nueva conversación">↻</button>
+      <button type="button" class="ia-btn-head" id="iaBtnReiniciar" title="Nueva conversación">🔄</button>
       <button type="button" class="ia-btn-head" id="iaBtnCerrar" title="Cerrar chat">✕</button>
     </div>
   </div>
@@ -345,10 +336,10 @@
 
   <div class="ia-mensajes" id="iaLogMensajes" aria-live="polite"></div>
 
-  <!-- Mini-Mapa Interactivo -->
+  <!-- Mini-Mapa Interactivo Integrado -->
   <div class="ia-mapa-overlay" id="iaMapaPanel">
     <div class="ia-mapa-top">
-      <span>📍 Toca el mapa o mueve el pin</span>
+      <span>📍 Toca el mapa o arrastra el pin</span>
       <span id="iaCoordsPreview">19.1738, -96.1348</span>
     </div>
     <div id="iaMiniMapa"></div>
@@ -366,10 +357,11 @@
   </div>
 
   <form class="ia-form" id="iaFormChat" autocomplete="off">
+    <button type="button" class="ia-btn-extra" id="iaBtnMic" title="Grabar nota de voz" disabled>🎤</button>
     <button type="button" class="ia-btn-extra" id="iaBtnGps" title="Elegir ubicación en el mapa" disabled>📍</button>
     <button type="button" class="ia-btn-extra" id="iaBtnFoto" title="Adjuntar foto (JPG/PNG/WEBP)" disabled>📷</button>
     <input type="file" id="iaInputFoto" accept="image/jpeg,image/png,image/webp" style="display:none;" />
-    <input type="text" class="ia-input" id="iaInputTexto" placeholder="Escribe tu duda o dirección..." maxlength="1000" disabled />
+    <input type="text" class="ia-input" id="iaInputTexto" placeholder="Escribe o graba nota de voz..." maxlength="1000" disabled />
     <button type="submit" class="ia-btn-enviar" id="iaBtnEnviar" disabled>Enviar</button>
   </form>
 </div>
@@ -389,11 +381,12 @@
   const form = document.getElementById('iaFormChat');
   const inputTexto = document.getElementById('iaInputTexto');
   const btnEnviar = document.getElementById('iaBtnEnviar');
+  const btnMic = document.getElementById('iaBtnMic');
   const btnGps = document.getElementById('iaBtnGps');
   const btnFoto = document.getElementById('iaBtnFoto');
   const inputFoto = document.getElementById('iaInputFoto');
   const chips = document.querySelectorAll('#iaSugerencias .ia-chip');
-
+  
   const mapaPanel = document.getElementById('iaMapaPanel');
   const coordsPreview = document.getElementById('iaCoordsPreview');
   const mapaEstado = document.getElementById('iaMapaEstado');
@@ -403,7 +396,6 @@
   if (!fab || !ventana) return;
 
   let sessionId = sessionStorage.getItem('respondin_sid') || '';
-  let esperandoUbicacion = sessionStorage.getItem('respondin_wait_loc') === '1';
   let historialVisual = [];
   try {
     historialVisual = JSON.parse(sessionStorage.getItem('respondin_historial') || '[]');
@@ -418,11 +410,8 @@
   let miniPin = null;
   let foto = null;
   let ocupado = false;
-
-  function setEsperandoUbicacion(valor) {
-    esperandoUbicacion = !!valor;
-    sessionStorage.setItem('respondin_wait_loc', esperandoUbicacion ? '1' : '0');
-  }
+  let mediaRecorder = null;
+  let chunksAudio = [];
 
   function estaEnElMar(lat, lng) {
     if (lat < 19.0000 || lat > 19.3000 || lng < -96.3500 || lng > -95.9500) return true;
@@ -444,37 +433,6 @@
     return false;
   }
 
-  // Convierte coordenadas escritas o una dirección escrita en lat/lng para que chatbot.php no se cicle
-  async function resolverUbicacionDesdeTexto(texto) {
-    const matchCoords = texto.match(/(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/);
-    if (matchCoords) {
-      return {
-        latitude: parseFloat(matchCoords[1]),
-        longitude: parseFloat(matchCoords[2])
-      };
-    }
-
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 3500);
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(texto + ', Veracruz, Mexico')}`;
-      const res = await fetch(url, { signal: ctrl.signal });
-      clearTimeout(timer);
-      const datos = await res.json();
-      if (Array.isArray(datos) && datos.length > 0) {
-        const lat = parseFloat(datos[0].lat);
-        const lng = parseFloat(datos[0].lon);
-        if (!estaEnElMar(lat, lng)) {
-          return { latitude: lat, longitude: lng };
-        }
-      }
-    } catch (_) {
-      // Si no hay salida a internet, usa el centro de Veracruz como respaldo
-    }
-
-    return { latitude: 19.1738, longitude: -96.1348 };
-  }
-
   function cargarLibreriaMapLibre() {
     return new Promise((resolve) => {
       if (typeof maplibregl !== 'undefined') {
@@ -491,13 +449,7 @@
       const script = document.createElement('script');
       script.src = 'https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js';
       script.onload = () => resolve(true);
-      script.onerror = () => {
-        const fallback = document.createElement('script');
-        fallback.src = 'https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.js';
-        fallback.onload = () => resolve(true);
-        fallback.onerror = () => resolve(false);
-        document.head.appendChild(fallback);
-      };
+      script.onerror = () => resolve(false);
       document.head.appendChild(script);
     });
   }
@@ -524,14 +476,12 @@
     mapaPanel.classList.add('visible');
     mapaEstado.style.color = '#4b5563';
     mapaEstado.textContent = 'Cargando mapa de Veracruz...';
-
     const ok = await cargarLibreriaMapLibre();
     if (!ok || typeof maplibregl === 'undefined') {
       mapaEstado.style.color = '#b45309';
-      mapaEstado.textContent = 'Sin conexión al mapa. Presiona "Usar esta ubicación" o escribe la calle en el chat.';
+      mapaEstado.textContent = 'Sin conexión al mapa. Escribe la dirección en el chat.';
       return;
     }
-
     if (!miniMapa) {
       miniMapa = new maplibregl.Map({
         container: 'iaMiniMapa',
@@ -549,35 +499,18 @@
         center: [tempLng, tempLat],
         zoom: 13
       });
-
       miniPin = new maplibregl.Marker({ color: '#691c32', draggable: true })
         .setLngLat([tempLng, tempLat])
         .addTo(miniMapa);
-
       miniPin.on('dragend', () => {
         const p = miniPin.getLngLat();
         actualizarPinTemporal(p.lat, p.lng, false);
       });
-
       miniMapa.on('click', (e) => {
         actualizarPinTemporal(e.lngLat.lat, e.lngLat.lng, false);
       });
     }
-
     setTimeout(() => { if (miniMapa) miniMapa.resize(); }, 150);
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => actualizarPinTemporal(pos.coords.latitude, pos.coords.longitude, true),
-        () => {
-          mapaEstado.style.color = '#4b5563';
-          mapaEstado.textContent = 'Toca el mapa o arrastra el marcador rojo al lugar del problema.';
-        },
-        { enableHighAccuracy: true, timeout: 6000 }
-      );
-    } else {
-      mapaEstado.textContent = 'Toca el mapa o arrastra el marcador rojo al lugar del problema.';
-    }
   }
 
   function guardarHistorialVisual() {
@@ -592,9 +525,32 @@
     div.textContent = texto;
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
-
     if (persistir) {
       historialVisual.push({ tipo: 'msg', rol, texto, extra });
+      guardarHistorialVisual();
+    }
+    return div;
+  }
+
+  function agregarBurbujaAudio(rol, srcAudio, texto = '', autoplay = false, persistir = true) {
+    const div = document.createElement('div');
+    div.className = `ia-msg ${rol === 'user' ? 'user' : 'bot'}`;
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.className = 'ia-audio-player';
+    audio.src = srcAudio;
+    if (autoplay) audio.autoplay = true;
+    div.appendChild(audio);
+    if (texto) {
+      const cap = document.createElement('div');
+      cap.className = rol === 'user' ? 'ia-transcripcion' : '';
+      cap.textContent = texto;
+      div.appendChild(cap);
+    }
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+    if (persistir) {
+      historialVisual.push({ tipo: 'audio', rol, srcAudio, texto });
       guardarHistorialVisual();
     }
     return div;
@@ -606,7 +562,6 @@
     div.textContent = texto;
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
-
     if (persistir) {
       historialVisual.push({ tipo: 'nota', texto });
       guardarHistorialVisual();
@@ -616,6 +571,7 @@
   function habilitarControles(activo) {
     inputTexto.disabled = !activo;
     btnEnviar.disabled = !activo;
+    btnMic.disabled = !activo;
     btnGps.disabled = !activo;
     btnFoto.disabled = !activo;
     chips.forEach(c => c.disabled = !activo);
@@ -628,6 +584,8 @@
     historialVisual.forEach(item => {
       if (item.tipo === 'nota') {
         agregarNota(item.texto, false);
+      } else if (item.tipo === 'audio') {
+        agregarBurbujaAudio(item.rol, item.srcAudio, item.texto, false, false);
       } else {
         agregarBurbuja(item.rol, item.texto, item.extra || '', false);
       }
@@ -649,18 +607,10 @@
     return resp.json();
   }
 
-  async function llamarIA(mensaje) {
+  async function llamarIA(mensaje, extra = {}) {
     ocupado = true;
     habilitarControles(false);
-    const escribiendo = agregarBurbuja('bot', 'Escribiendo...', '', false);
-
-    // Si el chat pidió ubicación y el usuario escribió dirección o coordenadas en texto, las resolvemos
-    if (!coords && mensaje) {
-      const tieneCoordsEscritas = /(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/.test(mensaje);
-      if (tieneCoordsEscritas || esperandoUbicacion) {
-        coords = await resolverUbicacionDesdeTexto(mensaje);
-      }
-    }
+    const escribiendo = agregarBurbuja('bot', extra.audio ? 'Escuchando y grabando respuesta...' : 'Escribiendo...', '', false);
 
     const fd = new FormData();
     fd.append('mensaje', mensaje);
@@ -673,6 +623,10 @@
     if (foto) {
       fd.append('foto', foto);
     }
+    if (extra.audio) {
+      fd.append('audio', extra.audio, 'nota_voz.webm');
+      fd.append('responder_voz', '1');
+    }
 
     try {
       const data = await enviarPeticionIA(fd);
@@ -681,7 +635,6 @@
       if (data.requiere_terminos) {
         sessionId = '';
         sessionStorage.removeItem('respondin_sid');
-        setEsperandoUbicacion(false);
         checkTerminos.checked = false;
         checkTerminos.disabled = false;
         cajaTerminos.style.display = 'block';
@@ -695,29 +648,23 @@
         sessionStorage.setItem('respondin_sid', sessionId);
       }
 
-      const textoRespuesta = (data.respuesta || data.error || 'Sin respuesta')
-        + (data.respuesta && data.error ? `\n[Detalle: ${data.error}]` : '');
-
-      // Detectar si el asistente está pidiendo la ubicación
-      const lowerResp = textoRespuesta.toLowerCase();
-      if (
-        lowerResp.includes('dónde está el problema') ||
-        lowerResp.includes('elegir la ubicación') ||
-        lowerResp.includes('ubicación actual')
-      ) {
-        setEsperandoUbicacion(true);
-      } else {
-        setEsperandoUbicacion(false);
+      if (extra.burbujaUser && data.transcripcion) {
+        const cap = extra.burbujaUser.querySelector('.ia-transcripcion');
+        if (cap) cap.textContent = `📝 "${data.transcripcion}"`;
       }
 
-      agregarBurbuja('bot', textoRespuesta, data.emergencia ? 'sos' : '');
+      const textoRespuesta = (data.respuesta || data.error || 'Sin respuesta');
+
+      if (data.audio_archivo) {
+        const rutaAudioServidor = apiActiva.replace('chatbot.php', 'uploads/' + data.audio_archivo);
+        agregarBurbujaAudio('bot', rutaAudioServidor, textoRespuesta, true);
+      } else {
+        agregarBurbuja('bot', textoRespuesta, data.emergencia ? 'sos' : '');
+      }
 
       if (data.folio) {
-        setEsperandoUbicacion(false);
-        agregarNota(`Folio generado: ${data.folio}`);
-        if (typeof cargarReportesBD === 'function') {
-          cargarReportesBD();
-        }
+        agregarNota(`Folio registrado: ${data.folio}`);
+        if (typeof cargarReportesBD === 'function') cargarReportesBD();
       }
 
       coords = null;
@@ -728,7 +675,6 @@
       escribiendo.remove();
       agregarBurbuja('bot', 'No pude conectar con el servicio de IA. Verifica que Apache y Ollama estén activos.');
     }
-
     ocupado = false;
     habilitarControles(true);
     inputTexto.focus();
@@ -753,7 +699,6 @@
     historialVisual = [];
     coords = null;
     foto = null;
-    setEsperandoUbicacion(false);
     sessionStorage.removeItem('respondin_sid');
     sessionStorage.removeItem('respondin_historial');
     log.innerHTML = '';
@@ -786,14 +731,43 @@
     e.preventDefault();
     const texto = inputTexto.value.trim();
     if ((!texto && !foto && !coords) || ocupado || !checkTerminos.checked) return;
-
     const etiquetaAuto = coords
       ? `[Ubicación: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}]`
       : '[Foto adjunta]';
-
     agregarBurbuja('user', texto || etiquetaAuto);
     inputTexto.value = '';
     llamarIA(texto);
+  });
+
+  /* Control de Grabación de Nota de Voz */
+  btnMic.addEventListener('click', async () => {
+    if (ocupado || !checkTerminos.checked) return;
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        chunksAudio = [];
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunksAudio.push(e.data); };
+        mediaRecorder.onstop = () => {
+          stream.getTracks().forEach(t => t.stop());
+          const blob = new Blob(chunksAudio, { type: mediaRecorder.mimeType || 'audio/webm' });
+          if (blob.size > 400) {
+            const bUser = agregarBurbujaAudio('user', URL.createObjectURL(blob), '🎤 Nota de voz enviada...', false);
+            llamarIA('', { audio: blob, burbujaUser: bUser });
+          }
+        };
+        mediaRecorder.start();
+        btnMic.classList.add('grabando');
+        btnMic.textContent = '⏹️';
+        agregarNota('Grabando nota de voz... Vuelve a tocar el micrófono para enviar.');
+      } catch (err) {
+        alert('Permite el acceso al micrófono en tu navegador para grabar notas de voz.');
+      }
+    } else {
+      mediaRecorder.stop();
+      btnMic.classList.remove('grabando');
+      btnMic.textContent = '🎤';
+    }
   });
 
   btnGps.addEventListener('click', () => {
@@ -813,7 +787,8 @@
     coords = { latitude: tempLat, longitude: tempLng };
     btnGps.classList.add('activo');
     mapaPanel.classList.remove('visible');
-    agregarNota(`Ubicación fijada: ${tempLat.toFixed(5)}, ${tempLng.toFixed(5)}`);
+    agregarBurbuja('user', '[Ubicación elegida en el mapa]');
+    llamarIA('');
   });
 
   btnCerrarMapa.addEventListener('click', () => {
@@ -821,7 +796,6 @@
   });
 
   btnFoto.addEventListener('click', () => inputFoto.click());
-
   inputFoto.addEventListener('change', (e) => {
     const f = e.target.files[0];
     if (!f) return;
@@ -837,7 +811,8 @@
     }
     foto = f;
     btnFoto.classList.add('activo');
-    agregarNota(`Foto lista: ${f.name}`);
+    agregarBurbuja('user', '[Foto adjunta]');
+    llamarIA('');
   });
 })();
 </script>

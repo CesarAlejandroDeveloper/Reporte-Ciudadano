@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Respondin · Ciudad Reporta</title>
+<title>Respondin — Ciudad Reporta</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script src="../mapa/protomaps-leaflet.js"></script>
@@ -21,9 +21,10 @@
   html, body { height: 100%; margin: 0; }
   body { font: 16px/1.45 "Segoe UI", system-ui, sans-serif; color: var(--ink); background: var(--bg); display: flex; justify-content: center; }
   .app { width: 100%; max-width: 640px; height: 100%; display: flex; flex-direction: column; background: var(--card); border-inline: 1px solid var(--line); }
-  header { padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  header { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   header h1 { margin: 0; font-size: 1.15rem; }
   header p { margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
+  header button { font-size: .85rem; padding: 7px 11px; white-space: nowrap; }
   #log { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
   .msg { max-width: 85%; padding: 10px 13px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .bot { align-self: flex-start; background: var(--bg); border-bottom-left-radius: 4px; }
@@ -37,7 +38,10 @@
   input[type=text] { flex: 1; min-width: 0; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; font: inherit; color: var(--ink); background: var(--card); }
   button { font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 10px 14px; }
   button.send, button.main { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); font-weight: 600; }
+  button.grabando { background: #dc2626 !important; color: #fff !important; border-color: #dc2626 !important; }
   button:disabled, input:disabled { opacity: .55; cursor: not-allowed; }
+  .audio-player { display: block; width: 240px; max-width: 100%; height: 38px; margin-bottom: 6px; }
+  .transcripcion { font-size: .82rem; opacity: .85; font-style: italic; }
   :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   .legal { padding: 6px 16px 10px; text-align: center; color: var(--muted); font-size: .76rem; line-height: 1.35; }
   .legal p { margin: 0; }
@@ -58,19 +62,19 @@
 <body>
 <div class="app">
   <header>
-    <h1>Respondin</h1>
-    <p>Reportes ciudadanos, trámites y seguimiento</p>
+    <div>
+      <h1>Respondin</h1>
+      <p>Reportes ciudadanos, trámites, seguimiento y voz</p>
+    </div>
+    <button type="button" id="btnNuevoChat" title="Iniciar una conversación nueva desde cero">↺ Nuevo chat</button>
   </header>
-
   <div id="log" aria-live="polite"></div>
-
   <div class="rapido" id="rapido" role="group" aria-label="Menú rápido"></div>
-
   <form id="form" autocomplete="off">
-    <input type="text" id="texto" placeholder="Escribe tu mensaje" aria-label="Escribe tu mensaje" disabled>
+    <button type="button" id="btnMic" title="Grabar nota de voz" disabled>🎤</button>
+    <input type="text" id="texto" placeholder="Escribe o graba nota de voz (ej. RC-000000-0000)…" aria-label="Escribe tu mensaje" disabled>
     <button class="send" id="enviar" disabled>Enviar</button>
   </form>
-
   <div class="legal">
     <p>Este chat es gestionado por una inteligencia artificial, la cual puede cometer errores.</p>
     <p>Al usar este servicio, aceptas los términos y condiciones del servicio y el aviso de privacidad.</p>
@@ -108,51 +112,78 @@
 </div>
 
 <script>
-  /* Respuestas rápidas: se muestran sin consultar a la IA. Edita los textos aquí. */
   const RAPIDAS = [
-    { t: '¿Cómo uso la página?', r: 'Es muy sencillo:\n1. Cuéntame qué problema quieres reportar.\n2. Dame tu nombre y tu número de WhatsApp.\n3. Adjunta una foto como evidencia con el botón que aparecerá.\n4. Elige en el mapa dónde está el problema.\n5. Confirma y recibirás un folio para darle seguimiento.\nTambién puedes escribir tu folio para consultar el estatus de un reporte.' },
-    { t: '¿Quién eres?', r: 'Soy Respondin, el asistente virtual de Ciudad Reporta. Funciono con inteligencia artificial y te ayudo a levantar reportes, consultar su estatus y resolver dudas sobre la plataforma. Puedo equivocarme, así que revisa tus datos antes de confirmar.' },
-    { t: '¿Quiénes somos?', r: 'Ciudad Reporta es una plataforma que conecta a la ciudadanía con el gobierno municipal para reportar problemas de la ciudad y dar seguimiento a su atención.' },
-    { t: 'Información general', r: 'Con Ciudad Reporta puedes reportar baches, luminarias apagadas, fugas de agua, basura y otros problemas de la ciudad. Cada reporte necesita tu nombre, tu WhatsApp, una foto y la ubicación en el mapa. Al registrarlo recibes un folio (por ejemplo, RC-000000-0000) para consultar su estatus cuando quieras. En una emergencia, llama al 911.' }
+    { t: '¿Cómo uso la página?' },
+    { t: 'Quiero hacer un reporte' },
+    { t: 'Consultar un folio' },
+    { t: '¿Quién eres?' },
+    { t: 'Información general' }
   ];
 
   const API = 'chatbot.php';
+  const STORAGE_KEY = 'respondin_sid';
   const $ = id => document.getElementById(id);
-  const log = $('log'), texto = $('texto'), enviar = $('enviar');
-  let sessionId = sessionStorage.getItem('respondin_sid') || '';
+  const log = $('log'), texto = $('texto'), enviar = $('enviar'), btnMic = $('btnMic');
+  let sessionId = localStorage.getItem(STORAGE_KEY) || '';
   let ocupado = false, accionEl = null;
 
   function pinta(rol, txt, extra = '') {
     const d = document.createElement('div');
-    d.className = 'msg ' + (rol === 'me' ? 'me' : 'bot') + ' ' + extra;
-    d.textContent = txt;                       // textContent: nunca interpreta HTML
+    d.className = 'msg ' + (rol === 'me' ? 'me' : 'bot') + (extra ? ' ' + extra : '');
+    d.textContent = txt;
     log.appendChild(d); log.scrollTop = log.scrollHeight;
     return d;
   }
+
+  function pintaAudio(rol, srcAudio, txt = '', autoplay = false) {
+    const d = document.createElement('div');
+    d.className = 'msg ' + (rol === 'me' ? 'me' : 'bot');
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.className = 'audio-player';
+    audio.src = srcAudio;
+    if (autoplay) audio.autoplay = true;
+    d.appendChild(audio);
+    if (txt) {
+      const cap = document.createElement('div');
+      cap.className = rol === 'me' ? 'transcripcion' : '';
+      cap.textContent = txt;
+      d.appendChild(cap);
+    }
+    log.appendChild(d); log.scrollTop = log.scrollHeight;
+    return d;
+  }
+
   function nota(txt) {
     const d = document.createElement('div'); d.className = 'note'; d.textContent = txt;
     log.appendChild(d); log.scrollTop = log.scrollHeight;
   }
+
   function boton(txt, fn, principal) {
     const b = document.createElement('button'); b.type = 'button';
     b.textContent = txt; if (principal) b.className = 'main';
     b.addEventListener('click', fn); return b;
   }
-  function habilita(on) { texto.disabled = enviar.disabled = !on; }
+
+  function habilita(on) { texto.disabled = enviar.disabled = btnMic.disabled = !on; }
   function quitaAccion() { if (accionEl) { accionEl.remove(); accionEl = null; } }
 
-  /* Botones que la IA pide según lo que falta */
   function muestraAccion(a) {
     quitaAccion();
     if (!a) return;
     const c = document.createElement('div'); c.className = 'acciones';
     if (a === 'foto') c.append(
       boton('📷 Abrir cámara', abreCamara, true),
-      boton('🖼️ Elegir foto', () => $('foto').click()));
-    if (a === 'ubicacion') c.append(boton('Elegir ubicación en el mapa', abreMapa, true));
+      boton('🖼️ Elegir foto', () => $('foto').click())
+    );
+    if (a === 'ubicacion') c.append(
+      boton('📍 Elegir ubicación en el mapa', abreMapa, true)
+    );
     if (a === 'confirmar') c.append(
-      boton('Sí, registrar', () => enviaTexto('Sí, confirmo'), true),
-      boton('Corregir un dato', () => enviaTexto('No, quiero corregir un dato')));
+      boton('Sí, registrar reporte', () => enviaTexto('Sí, confirmo'), true),
+      boton('Corregir un dato', () => enviaTexto('No, quiero corregir un dato')),
+      boton('Cancelar reporte', () => enviaTexto('Cancelar'))
+    );
     log.appendChild(c); log.scrollTop = log.scrollHeight; accionEl = c;
   }
 
@@ -161,6 +192,7 @@
     for (const k in campos) fd.append(k, campos[k]);
     if (extra.coords) { fd.append('latitud', extra.coords.latitude); fd.append('longitud', extra.coords.longitude); }
     if (extra.foto) fd.append('foto', extra.foto);
+    if (extra.audio) { fd.append('audio', extra.audio, 'nota_voz.webm'); fd.append('responder_voz', '1'); }
     const r = await fetch(API, { method: 'POST', body: fd });
     return r.json();
   }
@@ -168,19 +200,33 @@
   async function llamar(mensaje, extra = {}) {
     if (ocupado) return;
     ocupado = true; habilita(false); quitaAccion();
-    const espera = pinta('bot', 'Escribiendo…');
+    const espera = pinta('bot', extra.audio ? 'Escuchando y grabando respuesta…' : 'Escribiendo…');
     try {
       const d = await post({ mensaje, session_id: sessionId }, extra);
       espera.remove();
-      if (d.session_id) { sessionId = d.session_id; sessionStorage.setItem('respondin_sid', sessionId); }
-      pinta('bot', d.respuesta || d.error || 'No recibí respuesta. Intenta de nuevo.', d.emergencia ? 'sos' : '');
-      if (d.folio) nota('Folio: ' + d.folio + ' · guárdalo para consultar tu reporte');
+      if (d.session_id) {
+        sessionId = d.session_id;
+        localStorage.setItem(STORAGE_KEY, sessionId);
+      }
+      if (extra.burbujaUser && d.transcripcion) {
+        const cap = extra.burbujaUser.querySelector('.transcripcion');
+        if (cap) cap.textContent = `“${d.transcripcion}”`;
+      }
+      const txtResp = d.respuesta || d.error || 'No recibí respuesta. Intenta de nuevo.';
+      if (d.audio_archivo) {
+        pintaAudio('bot', 'uploads/' + d.audio_archivo, txtResp, true);
+      } else {
+        pinta('bot', txtResp, d.emergencia ? 'sos' : '');
+      }
+      if (d.folio) nota('✅ Folio registrado: ' + d.folio + ' — guárdalo para consultar el seguimiento de tu reporte');
       muestraAccion(d.accion);
     } catch (e) {
-      espera.remove(); pinta('bot', 'No pude conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
+      espera.remove();
+      pinta('bot', 'No pude conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
     }
     ocupado = false; habilita(true); texto.focus();
   }
+
   function enviaTexto(t) { pinta('me', t); llamar(t); }
 
   $('form').addEventListener('submit', e => {
@@ -190,12 +236,48 @@
     texto.value = ''; enviaTexto(t);
   });
 
-  /* Menú rápido */
+  /* Grabación de Nota de Voz */
+  let mediaRecorder = null, chunksAudio = [];
+  btnMic.addEventListener('click', async () => {
+    if (ocupado) return;
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        chunksAudio = [];
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunksAudio.push(e.data); };
+        mediaRecorder.onstop = () => {
+          stream.getTracks().forEach(t => t.stop());
+          const blob = new Blob(chunksAudio, { type: mediaRecorder.mimeType || 'audio/webm' });
+          if (blob.size > 400) {
+            const bUser = pintaAudio('me', URL.createObjectURL(blob), '🎤 Nota de voz enviada...', false);
+            llamar('', { audio: blob, burbujaUser: bUser });
+          }
+        };
+        mediaRecorder.start();
+        btnMic.classList.add('grabando');
+        btnMic.textContent = '⏹️';
+      } catch (err) {
+        nota('Permite el acceso al micrófono en tu navegador para grabar notas de voz.');
+      }
+    } else {
+      mediaRecorder.stop();
+      btnMic.classList.remove('grabando');
+      btnMic.textContent = '🎤';
+    }
+  });
+
   for (const q of RAPIDAS) {
-    $('rapido').append(boton(q.t, () => { if (!ocupado) { pinta('me', q.t); pinta('bot', q.r); } }));
+    $('rapido').append(boton(q.t, () => {
+      if (!ocupado && !texto.disabled) enviaTexto(q.t);
+    }));
   }
 
-  /* Foto: elegir de la galería o tomar con la cámara */
+  $('btnNuevoChat').addEventListener('click', () => {
+    if (ocupado) return;
+    nueva();
+  });
+
   function fotoElegida(e) {
     const f = e.target.files[0]; e.target.value = '';
     if (!f || ocupado) return;
@@ -204,8 +286,6 @@
   $('foto').addEventListener('change', fotoElegida);
   $('fotoCamara').addEventListener('change', fotoElegida);
 
-  /* Cámara: en celular usa la app de cámara del sistema (capture);
-     en computadora abre una vista previa con getUserMedia (requiere https o localhost). */
   let streamCam = null;
   const esTactil = window.matchMedia('(pointer: coarse)').matches;
   function cierraCamara() {
@@ -220,12 +300,13 @@
     if (esTactil || !puedeStream) { $('fotoCamara').click(); return; }
     try {
       streamCam = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false
+      });
       $('videoCam').srcObject = streamCam;
       $('modalCamara').hidden = false;
       $('btnCamCapturar').disabled = false;
     } catch (err) {
-      nota('No se pudo abrir la cámara (' + (err && err.name === 'NotAllowedError' ? 'permiso denegado' : 'no disponible') + '). Puedes elegir una foto de tu dispositivo.');
+      nota('No se pudo abrir la cámara. Puedes elegir una foto de tu dispositivo.');
     }
   }
   $('btnCamCancelar').addEventListener('click', cierraCamara);
@@ -243,7 +324,6 @@
     }, 'image/jpeg', 0.9);
   });
 
-  /* Mapa para elegir ubicación */
   let mapa = null, pin = null;
   function colocaPin(ll, zoom) {
     if (pin) pin.setLatLng(ll);
@@ -252,7 +332,7 @@
     $('btnConfirmarUbic').disabled = false;
   }
   function abreMapa() {
-    if (typeof L === 'undefined') { nota('No se pudo cargar el mapa. Revisa tu conexión a internet.'); return; }
+    if (typeof L === 'undefined') { nota('No se pudo cargar el mapa.'); return; }
     $('modalMapa').hidden = false;
     if (!mapa) {
       mapa = L.map('mapaSel', { minZoom: 7, maxZoom: 19, maxBounds: [[17.1, -98.7], [22.5, -93.6]], maxBoundsViscosity: 1 })
@@ -271,12 +351,13 @@
   $('btnCancelar').addEventListener('click', cierraMapa);
   $('btnActual').addEventListener('click', () => {
     const ayuda = $('ayudaMapa');
-    if (!navigator.geolocation) { ayuda.textContent = 'Tu navegador no permite obtener la ubicación. Toca el mapa para elegirla.'; return; }
-    ayuda.textContent = 'Permite el acceso a tu ubicación cuando el navegador lo pida…';
+    if (!navigator.geolocation) { ayuda.textContent = 'Tu navegador no permite obtener la ubicación.'; return; }
+    ayuda.textContent = 'Obteniendo ubicación…';
     navigator.geolocation.getCurrentPosition(
-      p => { colocaPin([p.coords.latitude, p.coords.longitude], 17); ayuda.textContent = 'Esta es tu ubicación actual. Arrastra el pin si necesitas ajustarlo y confirma.'; },
-      () => { ayuda.textContent = 'No pude obtener tu ubicación. Revisa los permisos o toca el mapa para elegirla.'; },
-      { enableHighAccuracy: true, timeout: 10000 });
+      p => { colocaPin([p.coords.latitude, p.coords.longitude], 17); ayuda.textContent = 'Ubicación lista. Confirma abajo.'; },
+      () => { ayuda.textContent = 'No pude obtener tu ubicación. Toca el mapa para elegirla.'; },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   });
   $('btnConfirmarUbic').addEventListener('click', () => {
     if (!pin) return;
@@ -285,28 +366,42 @@
     llamar('', { coords: { latitude: ll.lat, longitude: ll.lng } });
   });
 
-  /* Inicio: nueva conversación o retomar la actual */
   async function nueva() {
-    sessionStorage.removeItem('respondin_sid'); sessionId = '';
-    log.replaceChildren(); await llamar('');
+    localStorage.removeItem(STORAGE_KEY);
+    sessionId = '';
+    quitaAccion();
+    log.replaceChildren();
+    habilita(false);
+    await llamar('');
   }
+
   async function iniciar() {
     if (!sessionId) return nueva();
+    habilita(false);
     try {
       const h = await post({ accion: 'historial', session_id: sessionId });
-      if (!h.existe) return nueva();
-      const c = document.createElement('div'); c.className = 'msg bot';
-      c.append(document.createTextNode('Tienes una conversación en curso. ¿Qué quieres hacer?'));
-      const b = document.createElement('div'); b.className = 'acciones'; b.style.marginTop = '8px';
+      if (!h.existe || !Array.isArray(h.mensajes) || h.mensajes.length === 0) return nueva();
+      const c = document.createElement('div');
+      c.className = 'msg bot';
+      c.append(document.createTextNode('Tienes una conversación previa guardada. ¿Quieres continuar ese chat o iniciar uno nuevo desde cero?'));
+      const b = document.createElement('div');
+      b.className = 'acciones';
+      b.style.marginTop = '10px';
       b.append(
-        boton('Continuar conversación', () => {
+        boton('Continuar chat', () => {
           log.replaceChildren();
           for (const m of h.mensajes) pinta(m.rol === 'user' ? 'me' : 'bot', m.contenido);
-          muestraAccion(h.accion); habilita(true); texto.focus();
+          muestraAccion(h.accion);
+          habilita(true);
+          texto.focus();
         }, true),
-        boton('Nueva conversación', nueva));
-      c.append(b); log.append(c);
-    } catch (e) { pinta('bot', 'No pude conectar con el servidor. Revisa tu conexión e intenta de nuevo.'); }
+        boton('Iniciar nuevo chat', nueva)
+      );
+      c.append(b);
+      log.append(c);
+    } catch (e) {
+      pinta('bot', 'No pude conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
+    }
   }
   iniciar();
 </script>
