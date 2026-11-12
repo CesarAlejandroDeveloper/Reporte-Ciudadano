@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Detalle de Reporte - CiudadReporta</title>
   <link rel="stylesheet" href="../CSS/styles.css" />
-  <!-- Librería de mapa para la vista individual -->
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
   <style>
@@ -13,8 +12,31 @@
     .header-detalle { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
     .dato-grupo { margin-bottom: 20px; }
     .dato-label { font-weight: 600; color: var(--primary); font-size: 0.95rem; margin-bottom: 4px; display: block; }
-    .dato-valor { font-size: 1.05rem; color: var(--text); background: #fafafa; padding: 12px; border-radius: 6px; border: 1px solid var(--border); white-space: pre-line; }
-    .foto-evidencia { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border); margin-top: 10px; }
+    .dato-valor {
+      font-size: 1.05rem;
+      color: var(--text);
+      background: #fafafa;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .galeria-evidencias {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 10px;
+    }
+    .foto-evidencia {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+    }
     #contenedorResolucion { display: none; }
     .btn-volver { text-align: center; display: block; margin-top: 30px; background: var(--muted); }
     .btn-volver:hover { background: #4b5563; }
@@ -61,7 +83,6 @@
         <div class="dato-valor" id="txtDescripcion">...</div>
       </div>
 
-      <!-- MAPA DEL REPORTE -->
       <div class="dato-grupo">
         <span class="dato-label">Mapa de Ubicación del Incidente</span>
         <div id="mapaDetalle" style="height: 280px; width: 100%; border-radius: 8px; border: 1px solid var(--border); margin-top: 6px;"></div>
@@ -69,7 +90,7 @@
 
       <div class="dato-grupo">
         <span class="dato-label">Evidencia Fotográfica</span>
-        <img id="imgEvidencia" src="" alt="Evidencia" class="foto-evidencia" style="display: none;" />
+        <div id="contenedorGaleriaEvidencias" class="galeria-evidencias"></div>
       </div>
 
       <div class="stepper-wrapper" id="bloqueLineaTiempo">
@@ -93,6 +114,23 @@
     const urlParams = new URLSearchParams(window.location.search);
     const reporteID = urlParams.get('id');
 
+    function obtenerListaFotos(fotoUrl) {
+      if (!fotoUrl) return [];
+      let lista = [];
+      if (typeof fotoUrl === 'string' && fotoUrl.trim().startsWith('[')) {
+        try { lista = JSON.parse(fotoUrl); } catch (_) { lista = [fotoUrl]; }
+      } else if (Array.isArray(fotoUrl)) {
+        lista = fotoUrl;
+      } else {
+        lista = [fotoUrl];
+      }
+      return lista.filter(Boolean).map(u => {
+        if (u.startsWith('http') || u.startsWith('../')) return u;
+        if (u.startsWith('api/')) return '../../' + u;
+        return '../' + u;
+      });
+    }
+
     function renderizarMapa(lat, lng) {
       const mapa = new maplibregl.Map({
         container: 'mapaDetalle',
@@ -113,10 +151,7 @@
       });
 
       mapa.addControl(new maplibregl.NavigationControl());
-
-      new maplibregl.Marker({ color: '#e11d48' })
-        .setLngLat([lng, lat])
-        .addTo(mapa);
+      new maplibregl.Marker({ color: '#e11d48' }).setLngLat([lng, lat]).addTo(mapa);
     }
 
     async function buscarUbicacionYRenderizar(textoUbicacion) {
@@ -148,7 +183,7 @@
       }
 
       try {
-        const respuesta = await fetch(`../index.php/api/reportes?id=${reporteID}`);
+        const respuesta = await fetch(`../index.php/api/reportes?id=${encodeURIComponent(reporteID)}`);
         const datosNube = await respuesta.json();
 
         if (datosNube.error) {
@@ -156,29 +191,33 @@
           return;
         }
 
-        document.getElementById('folioID').innerText = datosNube.folio || ("#" + datosNube.id);
-        document.getElementById('badgeEstado').innerText = datosNube.estatus;
-        document.getElementById('txtTipo').innerText = datosNube.categoria;
-        document.getElementById('txtDescripcion').innerText = datosNube.descripcion || 'Sin descripción';
-        document.getElementById('txtFechaLevantamiento').innerText = datosNube.fecha_creacion;
+        document.getElementById('folioID').textContent = datosNube.folio || ("#" + datosNube.id);
+        document.getElementById('badgeEstado').textContent = datosNube.estatus;
+        document.getElementById('txtTipo').textContent = datosNube.categoria;
+        document.getElementById('txtDescripcion').textContent = datosNube.descripcion || 'Sin descripción';
+        document.getElementById('txtFechaLevantamiento').textContent = datosNube.fecha_creacion;
 
-        // Renderizar el mapa del reporte
         if (datosNube.latitud && datosNube.longitud) {
           renderizarMapa(parseFloat(datosNube.latitud), parseFloat(datosNube.longitud));
         } else {
           buscarUbicacionYRenderizar(datosNube.descripcion || datosNube.titulo || 'Veracruz');
         }
 
-        // Cargar evidencia fotográfica
-        if (datosNube.foto_url) {
-          const img = document.getElementById('imgEvidencia');
-          img.src = datosNube.foto_url.startsWith('http') || datosNube.foto_url.startsWith('../')
-            ? datosNube.foto_url
-            : '../' + datosNube.foto_url;
-          img.style.display = "block";
+        const galeria = document.getElementById('contenedorGaleriaEvidencias');
+        const fotos = obtenerListaFotos(datosNube.foto_url);
+        if (fotos.length > 0) {
+          fotos.forEach((src, i) => {
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = `Evidencia ${i + 1}`;
+            img.className = 'foto-evidencia';
+            img.onclick = () => window.open(src, '_blank', 'noopener');
+            galeria.appendChild(img);
+          });
+        } else {
+          galeria.innerHTML = '<span style="color: var(--muted); font-size: 0.9rem;">Sin fotografías adjuntas</span>';
         }
 
-        // Línea de tiempo / Estados
         const lineaTiempo = document.getElementById('bloqueLineaTiempo');
         const cartelResuelto = document.getElementById('cartelResuelto');
         const cartelDenegada = document.getElementById('cartelDenegada');

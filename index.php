@@ -1,68 +1,43 @@
 <?php
 session_start();
-
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
-
+require_once __DIR__ . '/modelo/config.php';
 require_once __DIR__ . '/modelo/Conexion.php';
 require_once __DIR__ . '/controlador/ReporteController.php';
 
-$database = new Conexion();
-$db = $database->obtenerConexion();
-$controller = new ReporteController($db);
+aplicar_cors_seguro('GET, POST, PUT, OPTIONS');
 
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    http_response_code(204);
+    exit();
+}
+
+$requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];
 
-// 1. RUTAS DE AUTENTICACIÓN ADMIN
-if (strpos($uri, '/api/login') !== false) {
-    if ($method === 'POST') {
+if (strpos($requestUri, '/api/') !== false) {
+    $conexion = new Conexion();
+    $db = $conexion->obtenerConexion();
+    $controller = new ReporteController($db);
+
+    if (preg_match('#/api/login$#', $requestUri) && $method === 'POST') {
         $controller->loginAdmin();
-    } else {
-        http_response_code(405);
-        echo json_encode(["error" => "Método no permitido"]);
-    }
-    exit();
-}
-
-if (strpos($uri, '/api/logout') !== false) {
-    $controller->logoutAdmin();
-    exit();
-}
-
-if (strpos($uri, '/api/session') !== false) {
-    $controller->verificarSesionAdmin();
-    exit();
-}
-
-// 2. RUTAS DE ESTATUS Y REPORTES
-if (strpos($uri, '/api/reportes/estatus') !== false) {
-    if ($method === 'POST' || $method === 'PUT') {
+    } elseif (preg_match('#/api/logout$#', $requestUri)) {
+        $controller->logoutAdmin();
+    } elseif (preg_match('#/api/session$#', $requestUri) && $method === 'GET') {
+        $controller->verificarSesionAdmin();
+    } elseif (preg_match('#/api/reportes$#', $requestUri) && $method === 'GET') {
+        $controller->listar();
+    } elseif (preg_match('#/api/reportes$#', $requestUri) && $method === 'POST') {
+        $controller->guardar();
+    } elseif (preg_match('#/api/reportes/estatus$#', $requestUri) && ($method === 'POST' || $method === 'PUT')) {
         $controller->actualizarEstatus();
     } else {
-        http_response_code(405);
-        echo json_encode(["error" => "Método no permitido"]);
+        http_response_code(404);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(["error" => "Endpoint no encontrado"]);
     }
     exit();
 }
 
-if (strpos($uri, '/api/reportes') !== false) {
-    if ($method === 'GET') {
-        $controller->listar();
-    } elseif ($method === 'POST') {
-        $controller->guardar();
-    } else {
-        http_response_code(405);
-        echo json_encode(["error" => "Método no permitido"]);
-    }
-    exit();
-}
-
-// 3. VISTA PRINCIPAL POR DEFECTO
-require_once __DIR__ . '/vista/Home.php';
+header("Location: vista/Home.php");
+exit();

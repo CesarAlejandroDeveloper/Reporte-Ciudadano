@@ -3,7 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Respondin · Ciudad que responde</title>
+<title>Respondin · Ciudad Reporta</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="../mapa/protomaps-leaflet.js"></script>
+<script>window.protomapsL || document.write('<script src="https://unpkg.com/protomaps-leaflet@5.0.0/dist/protomaps-leaflet.js"><\/script>')</script>
 <style>
   :root {
     --ink:#1c2733; --muted:#5d6b7a; --bg:#eef1f5; --card:#ffffff; --line:#d5dbe3;
@@ -15,31 +19,37 @@
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body { font: 16px/1.45 "Segoe UI", system-ui, sans-serif; color: var(--ink); background: var(--bg);
-         display: flex; justify-content: center; }
-  .app { width: 100%; max-width: 640px; height: 100%; display: flex; flex-direction: column; background: var(--card);
-         border-inline: 1px solid var(--line); }
+  body { font: 16px/1.45 "Segoe UI", system-ui, sans-serif; color: var(--ink); background: var(--bg); display: flex; justify-content: center; }
+  .app { width: 100%; max-width: 640px; height: 100%; display: flex; flex-direction: column; background: var(--card); border-inline: 1px solid var(--line); }
   header { padding: 14px 18px; border-bottom: 1px solid var(--line); }
   header h1 { margin: 0; font-size: 1.15rem; }
   header p { margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
-  #terms { padding: 18px; border-bottom: 1px solid var(--line); }
-  #terms label { display: flex; gap: 10px; align-items: flex-start; }
   #log { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
-  .msg { max-width: 85%; padding: 10px 13px; border-radius: 14px; white-space: pre-wrap; word-wrap: break-word; }
-  .bot  { align-self: flex-start; background: var(--bg); border-bottom-left-radius: 4px; }
-  .me   { align-self: flex-end; background: var(--mine); border-bottom-right-radius: 4px; }
-  .sos  { border-left: 4px solid var(--alert); }
-  .note { align-self: center; color: var(--muted); font-size: .85rem; }
-  form { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); align-items: center; }
-  input[type=text] { flex: 1; min-width: 0; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px;
-                     font: inherit; color: var(--ink); background: var(--card); }
-  button { font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--line);
-           background: var(--card); color: var(--ink); padding: 10px 12px; }
-  button.send { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); font-weight: 600; }
-  button.on { outline: 2px solid var(--brand); }
+  .msg { max-width: 85%; padding: 10px 13px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .bot { align-self: flex-start; background: var(--bg); border-bottom-left-radius: 4px; }
+  .me  { align-self: flex-end; background: var(--mine); border-bottom-right-radius: 4px; }
+  .sos { border-left: 4px solid var(--alert); }
+  .note { align-self: center; color: var(--muted); font-size: .85rem; text-align: center; }
+  .acciones { align-self: flex-start; display: flex; gap: 8px; flex-wrap: wrap; }
+  .rapido { display: flex; gap: 8px; padding: 8px 14px 0; overflow-x: auto; border-top: 1px solid var(--line); }
+  .rapido button { white-space: nowrap; border-radius: 999px; font-size: .88rem; padding: 6px 12px; }
+  form { display: flex; gap: 8px; padding: 10px 14px; align-items: center; }
+  input[type=text] { flex: 1; min-width: 0; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; font: inherit; color: var(--ink); background: var(--card); }
+  button { font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 10px 14px; }
+  button.send, button.main { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); font-weight: 600; }
   button:disabled, input:disabled { opacity: .55; cursor: not-allowed; }
   :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
-  #foto { display: none; }
+  .legal { padding: 6px 16px 10px; text-align: center; color: var(--muted); font-size: .76rem; line-height: 1.35; }
+  .legal p { margin: 0; }
+  #modalMapa, #modalCam { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 12px; z-index: 1000; }
+  #modalMapa[hidden], #modalCam[hidden] { display: none; }
+  #video { flex: 1; min-height: 0; width: 100%; background: #000; object-fit: contain; }
+  .dialogo { width: 100%; max-width: 720px; height: min(85vh, 640px); background: var(--card); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; }
+  .dialogo h2 { margin: 0; padding: 12px 16px 2px; font-size: 1.05rem; }
+  .dialogo .ayuda { margin: 0; padding: 0 16px 8px; color: var(--muted); font-size: .88rem; }
+  #mapaSel { flex: 1; min-height: 0; }
+  .barra { display: flex; gap: 8px; padding: 10px 14px; flex-wrap: wrap; border-top: 1px solid var(--line); }
+  .barra .espacio { flex: 1; }
 </style>
 </head>
 <body>
@@ -49,35 +59,70 @@
     <p>Reportes ciudadanos, trámites y seguimiento</p>
   </header>
 
-  <div id="terms">
-    <label>
-      <input type="checkbox" id="acepto">
-      <span>Esta conversación se guarda con fines de seguridad y seguimiento. Acepto los términos y condiciones del servicio.</span>
-    </label>
-  </div>
-
   <div id="log" aria-live="polite"></div>
 
+  <div class="rapido" id="rapido" role="group" aria-label="Menú rápido"></div>
+
   <form id="form" autocomplete="off">
-    <button type="button" id="btnGps" title="Compartir mi ubicación" aria-label="Compartir mi ubicación" disabled>Ubicación</button>
-    <button type="button" id="btnFoto" title="Adjuntar foto" aria-label="Adjuntar foto" disabled>Foto</button>
-    <input type="file" id="foto" accept="image/jpeg,image/png,image/webp">
-    <input type="text" id="texto" placeholder="Escribe tu mensaje" disabled>
+    <input type="text" id="texto" placeholder="Escribe tu mensaje" aria-label="Escribe tu mensaje" disabled>
     <button class="send" id="enviar" disabled>Enviar</button>
   </form>
+
+  <div class="legal">
+    <p>Este chat es gestionado por una inteligencia artificial, la cual puede cometer errores.</p>
+    <p>Al usar este servicio, aceptas los términos y condiciones del servicio y el aviso de privacidad.</p>
+  </div>
+</div>
+
+<input type="file" id="foto" accept="image/jpeg,image/png,image/webp" hidden>
+<input type="file" id="fotoCam" accept="image/*" capture="environment" hidden>
+
+<div id="modalCam" hidden>
+  <div class="dialogo" role="dialog" aria-modal="true" aria-labelledby="tCam">
+    <h2 id="tCam">Toma la foto del problema</h2>
+    <p class="ayuda" id="ayudaCam"></p>
+    <video id="video" autoplay playsinline muted></video>
+    <div class="barra">
+      <span class="espacio"></span>
+      <button type="button" id="btnCamCancelar">Cancelar</button>
+      <button type="button" class="main" id="btnCapturar" disabled>Tomar foto</button>
+    </div>
+  </div>
+</div>
+
+<div id="modalMapa" hidden>
+  <div class="dialogo" role="dialog" aria-modal="true" aria-labelledby="tMapa">
+    <h2 id="tMapa">Elige la ubicación del problema</h2>
+    <p class="ayuda" id="ayudaMapa">Toca el mapa para colocar el pin o usa tu ubicación actual.</p>
+    <div id="mapaSel"></div>
+    <div class="barra">
+      <button type="button" id="btnActual">Usar mi ubicación actual</button>
+      <span class="espacio"></span>
+      <button type="button" id="btnCancelar">Cancelar</button>
+      <button type="button" class="main" id="btnConfirmarUbic" disabled>Confirmar ubicación</button>
+    </div>
+  </div>
 </div>
 
 <script>
+  /* Respuestas rápidas: se muestran sin consultar a la IA. Edita los textos aquí. */
+  const RAPIDAS = [
+    { t: '¿Cómo uso la página?', r: 'Es muy sencillo:\n1. Cuéntame qué problema quieres reportar.\n2. Dame tu nombre y tu número de WhatsApp.\n3. Adjunta una foto como evidencia con el botón que aparecerá.\n4. Elige en el mapa dónde está el problema.\n5. Confirma y recibirás un folio para darle seguimiento.\nTambién puedes escribir tu folio para consultar el estatus de un reporte.' },
+    { t: '¿Quién eres?', r: 'Soy Respondin, el asistente virtual de Ciudad Reporta. Funciono con inteligencia artificial y te ayudo a levantar reportes, consultar su estatus y resolver dudas sobre la plataforma. Puedo equivocarme, así que revisa tus datos antes de confirmar.' },
+    { t: '¿Quiénes somos?', r: 'Ciudad Reporta es una plataforma que conecta a la ciudadanía con el gobierno municipal para reportar problemas de la ciudad y dar seguimiento a su atención.' },
+    { t: 'Información general', r: 'Con Ciudad Reporta puedes reportar baches, luminarias apagadas, fugas de agua, basura y otros problemas de la ciudad. Cada reporte necesita tu nombre, tu WhatsApp, una foto y la ubicación en el mapa. Al registrarlo recibes un folio (por ejemplo, RC-000000-0000) para consultar su estatus cuando quieras. En una emergencia, llama al 911.' }
+  ];
+
   const API = 'chatbot.php';
   const $ = id => document.getElementById(id);
   const log = $('log'), texto = $('texto'), enviar = $('enviar');
   let sessionId = sessionStorage.getItem('respondin_sid') || '';
-  let coords = null, foto = null, ocupado = false;
+  let ocupado = false, accionEl = null;
 
   function pinta(rol, txt, extra = '') {
     const d = document.createElement('div');
     d.className = 'msg ' + (rol === 'me' ? 'me' : 'bot') + ' ' + extra;
-    d.textContent = txt;           // textContent: nunca interpreta HTML
+    d.textContent = txt;                       // textContent: nunca interpreta HTML
     log.appendChild(d); log.scrollTop = log.scrollHeight;
     return d;
   }
@@ -85,61 +130,192 @@
     const d = document.createElement('div'); d.className = 'note'; d.textContent = txt;
     log.appendChild(d); log.scrollTop = log.scrollHeight;
   }
-  function habilita(on) {
-    [texto, enviar, $('btnGps'), $('btnFoto')].forEach(e => e.disabled = !on);
+  function boton(txt, fn, principal) {
+    const b = document.createElement('button'); b.type = 'button';
+    b.textContent = txt; if (principal) b.className = 'main';
+    b.addEventListener('click', fn); return b;
+  }
+  function habilita(on) { texto.disabled = enviar.disabled = !on; }
+  function quitaAccion() { if (accionEl) { accionEl.remove(); accionEl = null; } }
+
+  /* Botones que la IA pide según lo que falta */
+  function muestraAccion(a) {
+    quitaAccion();
+    if (!a) return;
+    const c = document.createElement('div'); c.className = 'acciones';
+    if (a === 'foto') c.append(boton('Subir foto', () => $('foto').click(), true), boton('Tomar foto con la cámara', abreCamara));
+    if (a === 'ubicacion') c.append(boton('Elegir ubicación en el mapa', abreMapa, true));
+    if (a === 'confirmar') c.append(
+      boton('Sí, registrar', () => enviaTexto('Sí, confirmo'), true),
+      boton('Corregir un dato', () => enviaTexto('No, quiero corregir un dato')));
+    log.appendChild(c); log.scrollTop = log.scrollHeight; accionEl = c;
   }
 
-  async function llamar(mensaje) {
-    ocupado = true; habilita(false);
-    const espera = pinta('bot', 'Escribiendo…');
+  async function post(campos, extra = {}) {
     const fd = new FormData();
-    fd.append('mensaje', mensaje);
-    fd.append('session_id', sessionId);
-    fd.append('acepta_terminos', $('acepto').checked ? 'true' : 'false');
-    if (coords) { fd.append('latitud', coords.latitude); fd.append('longitud', coords.longitude); }
-    if (foto) fd.append('foto', foto);
+    for (const k in campos) fd.append(k, campos[k]);
+    if (extra.coords) { fd.append('latitud', extra.coords.latitude); fd.append('longitud', extra.coords.longitude); }
+    if (extra.foto) fd.append('foto', extra.foto);
+    const r = await fetch(API, { method: 'POST', body: fd });
+    return r.json();
+  }
+
+  async function llamar(mensaje, extra = {}) {
+    if (ocupado) return;
+    ocupado = true; habilita(false); quitaAccion();
+    const espera = pinta('bot', 'Escribiendo…');
     try {
-      const r = await fetch(API, { method: 'POST', body: fd });
-      const d = await r.json();
+      const d = await post({ mensaje, session_id: sessionId }, extra);
       espera.remove();
       if (d.session_id) { sessionId = d.session_id; sessionStorage.setItem('respondin_sid', sessionId); }
-      pinta('bot', (d.respuesta || d.error || 'Sin respuesta') + (d.respuesta && d.error ? '\n[detalle: ' + d.error + ']' : ''), d.emergencia ? 'sos' : '');
+      pinta('bot', d.respuesta || d.error || 'No recibí respuesta. Intenta de nuevo.', d.emergencia ? 'sos' : '');
       if (d.folio) nota('Folio: ' + d.folio + ' · guárdalo para consultar tu reporte');
-      coords = null; foto = null;
-      $('btnGps').classList.remove('on'); $('btnFoto').classList.remove('on');
+      muestraAccion(d.accion);
     } catch (e) {
-      espera.remove(); pinta('bot', 'No pude conectar con el servidor. Revisa que Apache esté encendido.');
+      espera.remove(); pinta('bot', 'No pude conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
     }
     ocupado = false; habilita(true); texto.focus();
   }
-
-  $('acepto').addEventListener('change', async e => {
-    if (!e.target.checked || sessionId) return;
-    e.target.disabled = true; $('terms').style.display = 'none';
-    await llamar('');            // pide el saludo inicial
-  });
-  if (sessionId) { $('acepto').checked = true; $('terms').style.display = 'none'; habilita(true); nota('Sesión retomada'); }
+  function enviaTexto(t) { pinta('me', t); llamar(t); }
 
   $('form').addEventListener('submit', e => {
     e.preventDefault();
     const t = texto.value.trim();
-    if ((!t && !foto && !coords) || ocupado) return;
-    pinta('me', t || (foto ? '[Foto adjunta]' : '[Ubicación compartida]'));
-    texto.value = '';
-    llamar(t);
+    if (!t || ocupado) return;
+    texto.value = ''; enviaTexto(t);
   });
 
-  $('btnGps').addEventListener('click', () => {
-    navigator.geolocation.getCurrentPosition(
-      p => { coords = p.coords; $('btnGps').classList.add('on'); nota('Ubicación lista; se envía con tu siguiente mensaje'); },
-      () => nota('No se pudo obtener la ubicación. Descríbela con palabras.'),
-      { enableHighAccuracy: true, timeout: 10000 });
+  /* Menú rápido */
+  for (const q of RAPIDAS) {
+    $('rapido').append(boton(q.t, () => { if (!ocupado) { pinta('me', q.t); pinta('bot', q.r); } }));
+  }
+
+  /* Foto: subir desde el dispositivo o tomarla con la cámara */
+  function enviaFoto(f) { if (f && !ocupado) { pinta('me', '[Foto adjunta]'); llamar('', { foto: f }); } }
+  for (const id of ['foto', 'fotoCam']) {
+    $(id).addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; enviaFoto(f); });
+  }
+
+  let flujoCam = null;
+  const cierraCamara = () => {
+    if (flujoCam) { flujoCam.getTracks().forEach(t => t.stop()); flujoCam = null; }
+    $('video').srcObject = null; $('modalCam').hidden = true;
+  };
+  function errorCamara(e) {
+    if (e && e.name === 'NotAllowedError') return 'El permiso de la cámara está bloqueado. Toca el candado junto a la dirección, permite la cámara y vuelve a intentar. También puedes cancelar y usar "Subir foto".';
+    if (e && e.name === 'NotFoundError') return 'No encontré una cámara en este dispositivo. Cancela y usa "Subir foto".';
+    if (e && e.name === 'NotReadableError') return 'La cámara está siendo usada por otra aplicación. Ciérrala e intenta de nuevo.';
+    return 'No pude abrir la cámara. Cancela y usa "Subir foto".';
+  }
+  async function abreCamara() {
+    // Sin HTTPS el navegador no ofrece la cámara en vivo: se usa la app de cámara del dispositivo
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      nota('Este sitio no usa HTTPS, así que se abrirá la cámara del dispositivo (en computadora se abre el selector de archivos).');
+      $('fotoCam').click(); return;
+    }
+    $('modalCam').hidden = false; $('btnCapturar').disabled = true;
+    $('ayudaCam').textContent = 'Permite el acceso a la cámara cuando el navegador lo pida…';
+    try {
+      flujoCam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+      $('video').srcObject = flujoCam;
+      $('ayudaCam').textContent = 'Encuadra el problema y toma la foto.';
+      $('btnCapturar').disabled = false;
+    } catch (e) { $('ayudaCam').textContent = errorCamara(e); }
+  }
+  $('btnCamCancelar').addEventListener('click', cierraCamara);
+  $('btnCapturar').addEventListener('click', () => {
+    const v = $('video'); if (!v.videoWidth) return;
+    const k = Math.min(1, 1600 / Math.max(v.videoWidth, v.videoHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    c.toBlob(b => {
+      cierraCamara();
+      if (b) enviaFoto(new File([b], 'foto.jpg', { type: 'image/jpeg' }));
+    }, 'image/jpeg', 0.85);
   });
-  $('btnFoto').addEventListener('click', () => $('foto').click());
-  $('foto').addEventListener('change', e => {
-    foto = e.target.files[0] || null;
-    if (foto) { $('btnFoto').classList.add('on'); nota('Foto lista; se envía con tu siguiente mensaje'); }
+
+  /* Mapa para elegir ubicación */
+  let mapa = null, pin = null;
+  function colocaPin(ll, zoom) {
+    if (pin) pin.setLatLng(ll);
+    else { pin = L.marker(ll, { draggable: true }).addTo(mapa); }
+    if (zoom) mapa.setView(ll, zoom);
+    $('btnConfirmarUbic').disabled = false;
+  }
+  function abreMapa() {
+    if (typeof L === 'undefined') { nota('No se pudo cargar el mapa. Revisa tu conexión a internet.'); return; }
+    $('modalMapa').hidden = false;
+    if (!mapa) {
+      mapa = L.map('mapaSel', { minZoom: 7, maxZoom: 19, maxBounds: [[17.1, -98.7], [22.5, -93.6]], maxBoundsViscosity: 1 })
+        .setView([19.1738, -96.1348], 13);
+      if (window.protomapsL) {
+        protomapsL.leafletLayer({ url: '../mapa/veracruz.pmtiles', flavor: 'light', maxDataZoom: 14, maxZoom: 19,
+          attribution: '&copy; OpenStreetMap | Protomaps' }).addTo(mapa);
+      } else {
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapa);
+      }
+      mapa.on('click', e => colocaPin(e.latlng));
+    }
+    setTimeout(() => mapa.invalidateSize(), 60);
+  }
+  const cierraMapa = () => { $('modalMapa').hidden = true; };
+  $('btnCancelar').addEventListener('click', cierraMapa);
+  function errorUbic(e) {
+    const det = ' [código ' + e.code + (e.message ? ': ' + e.message : '') + ']';
+    return errorUbicTexto(e) + det;
+  }
+  function errorUbicTexto(e) {
+    if (e.code === 1) return 'El permiso de ubicación está bloqueado. Toca el candado junto a la dirección, permite "Ubicación" y vuelve a intentar. En Windows revisa también que la ubicación esté activada en Configuración > Privacidad. Mientras tanto, toca el mapa para elegir el punto.';
+    if (e.code === 2) return 'No pude determinar tu ubicación (sin señal o ubicación desactivada en el equipo). Toca el mapa para elegirla.';
+    return 'La ubicación tardó demasiado en responder. Intenta de nuevo o toca el mapa para elegirla.';
+  }
+  $('btnActual').addEventListener('click', () => {
+    const ayuda = $('ayudaMapa');
+    if (!window.isSecureContext) {
+      ayuda.textContent = 'El navegador bloquea la ubicación en sitios sin HTTPS. Abre la página con https:// (o con localhost) o toca el mapa para elegir el punto.'; return;
+    }
+    if (!navigator.geolocation) { ayuda.textContent = 'Tu navegador no permite obtener la ubicación. Toca el mapa para elegirla.'; return; }
+    ayuda.textContent = 'Permite el acceso a tu ubicación cuando el navegador lo pida…';
+    const ok = p => { colocaPin([p.coords.latitude, p.coords.longitude], 17); ayuda.textContent = 'Esta es tu ubicación actual. Arrastra el pin si necesitas ajustarlo y confirma.'; };
+    navigator.geolocation.getCurrentPosition(ok, e => {
+      if (e.code === 1) { ayuda.textContent = errorUbic(e); return; }
+      // Sin GPS preciso: reintenta con ubicación aproximada (Wi-Fi / red)
+      navigator.geolocation.getCurrentPosition(ok, e2 => { ayuda.textContent = errorUbic(e2); },
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
+    }, { enableHighAccuracy: true, timeout: 8000 });
   });
+  $('btnConfirmarUbic').addEventListener('click', () => {
+    if (!pin) return;
+    const ll = pin.getLatLng(); cierraMapa();
+    pinta('me', '[Ubicación elegida en el mapa]');
+    llamar('', { coords: { latitude: ll.lat, longitude: ll.lng } });
+  });
+
+  /* Inicio: nueva conversación o retomar la actual */
+  async function nueva() {
+    sessionStorage.removeItem('respondin_sid'); sessionId = '';
+    log.replaceChildren(); await llamar('');
+  }
+  async function iniciar() {
+    if (!sessionId) return nueva();
+    try {
+      const h = await post({ accion: 'historial', session_id: sessionId });
+      if (!h.existe) return nueva();
+      const c = document.createElement('div'); c.className = 'msg bot';
+      c.append(document.createTextNode('Tienes una conversación en curso. ¿Qué quieres hacer?'));
+      const b = document.createElement('div'); b.className = 'acciones'; b.style.marginTop = '8px';
+      b.append(
+        boton('Continuar conversación', () => {
+          log.replaceChildren();
+          for (const m of h.mensajes) pinta(m.rol === 'user' ? 'me' : 'bot', m.contenido);
+          muestraAccion(h.accion); habilita(true); texto.focus();
+        }, true),
+        boton('Nueva conversación', nueva));
+      c.append(b); log.append(c);
+    } catch (e) { pinta('bot', 'No pude conectar con el servidor. Revisa tu conexión e intenta de nuevo.'); }
+  }
+  iniciar();
 </script>
 </body>
 </html>
