@@ -5,8 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Hacer un Reporte - CiudadReporta</title>
   <link rel="stylesheet" href="../CSS/styles.css" />
-  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
-  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+  <link
+    href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css"
+    rel="stylesheet"
+    onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.css';"
+  />
+  <script
+    src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"
+    onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist/maplibre-gl.js';document.head.appendChild(s);"
+  ></script>
   <style>
     .portal-wrapper {
       max-width: 1220px;
@@ -45,9 +52,20 @@
       gap: 24px;
       align-items: start;
     }
+    /* En celular: el formulario va ARRIBA (order: 1) y los reportes recientes ABAJO (order: 2) */
     @media (max-width: 900px) {
+      .portal-wrapper {
+        padding: 14px;
+      }
       .portal-grid {
         grid-template-columns: 1fr;
+        gap: 18px;
+      }
+      .col-formulario {
+        order: 1;
+      }
+      .col-reportes {
+        order: 2;
       }
     }
     .panel-card {
@@ -152,6 +170,8 @@
       font-size: 0.95rem;
       font-family: inherit;
       box-sizing: border-box;
+      background: #ffffff;
+      color: #111827;
     }
     .ubicacion-row {
       display: flex;
@@ -172,11 +192,29 @@
       color: var(--primary, #691c32);
     }
     #mapaReporte {
+      display: block;
+      position: relative;
+      z-index: 1;
       width: 100%;
-      height: 240px;
+      height: 250px;
+      min-height: 250px;
       border-radius: 10px;
       border: 1px solid var(--border, #d1d5db);
       margin-top: 8px;
+      background: #eef2f6;
+      overflow: hidden;
+    }
+    .mapa-fallback {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 16px;
+      text-align: center;
+      color: #4b5563;
+      font-size: 0.88rem;
+      box-sizing: border-box;
     }
     .helper-text {
       display: block;
@@ -184,19 +222,74 @@
       color: var(--muted, #6b7280);
       margin-top: 4px;
     }
+
+    /* Botones dedicados para Cámara y Galería en celular */
+    .botones-foto-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .btn-captura {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 11px 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.88rem;
+      cursor: pointer;
+      border: 1px solid #d1d5db;
+      background: #f9fafb;
+      color: #1f2937;
+    }
+    .btn-captura-camara {
+      background: #fdf2f4;
+      border-color: var(--primary, #691c32);
+      color: var(--primary, #691c32);
+    }
+    .btn-captura:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .preview-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 8px;
       margin-top: 10px;
     }
-    .preview-grid img {
-      width: 100%;
-      height: 90px;
-      object-fit: cover;
+    .preview-item {
+      position: relative;
       border-radius: 8px;
+      overflow: hidden;
       border: 1px solid #d1d5db;
+      height: 92px;
     }
+    .preview-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .btn-quitar-foto {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(17, 24, 39, 0.8);
+      color: #ffffff;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     .btn-submit {
       width: 100%;
       padding: 13px;
@@ -246,8 +339,8 @@
     </header>
 
     <div class="portal-grid">
-      <!-- COLUMNA IZQUIERDA: MÁXIMO 5 REPORTES RECIENTES -->
-      <section class="panel-card">
+      <!-- COLUMNA IZQUIERDA (EN CELULAR PASA ABAJO): MÁXIMO 5 REPORTES RECIENTES -->
+      <section class="panel-card col-reportes">
         <div class="panel-title-row">
           <h2>Reportes Recientes</h2>
           <span class="contador-pill" id="contadorVisibles">Cargando...</span>
@@ -259,8 +352,8 @@
         </div>
       </section>
 
-      <!-- COLUMNA DERECHA: FORMULARIO PARA GENERAR REPORTE -->
-      <section class="panel-card">
+      <!-- COLUMNA DERECHA (EN CELULAR PASA ARRIBA): FORMULARIO PARA GENERAR REPORTE -->
+      <section class="panel-card col-formulario">
         <div class="panel-title-row">
           <h2>Nuevo Reporte Ciudadano</h2>
         </div>
@@ -284,7 +377,7 @@
           </div>
 
           <div class="form-group">
-            <label for="ubicacion">Ubicación (escribe dirección y presiona Enter, o mueve el pin) *</label>
+            <label for="ubicacion">Ubicación (escribe dirección y presiona Enter, o selecciona en el mapa) *</label>
             <div class="ubicacion-row">
               <input
                 type="text"
@@ -300,7 +393,7 @@
               </button>
             </div>
             <span class="helper-text" id="direccionDetectada">
-              Presiona Enter tras escribir una calle para ubicarla en el mapa, o arrastra el marcador rojo.
+              Toca el mapa, arrastra el marcador rojo o escribe una calle y presiona Enter.
             </span>
             <div id="mapaReporte"></div>
           </div>
@@ -319,17 +412,36 @@
           </div>
 
           <div class="form-group">
-            <label for="evidencia">Evidencia fotográfica (1 a 3 fotos, máx. 8 MB c/u) *</label>
+            <label>Evidencia fotográfica (1 a 3 fotos) *</label>
+
+            <!-- Inputs ocultos: uno exclusivo para cámara trasera y otro para galería -->
             <input
               type="file"
-              id="evidencia"
-              name="evidencia[]"
-              class="input-mobile"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              required
+              id="inputCamara"
+              accept="image/*"
+              capture="environment"
+              style="display: none;"
             />
-            <span class="helper-text">Formatos permitidos: JPG, PNG o WEBP.</span>
+            <input
+              type="file"
+              id="inputGaleria"
+              accept="image/*"
+              multiple
+              style="display: none;"
+            />
+
+            <div class="botones-foto-row">
+              <button type="button" class="btn-captura btn-captura-camara" id="btnAbrirCamara">
+                📷 Tomar foto
+              </button>
+              <button type="button" class="btn-captura" id="btnAbrirGaleria">
+                🖼️ Galería
+              </button>
+            </div>
+
+            <span class="helper-text" id="estadoFotos">
+              0 de 3 fotos agregadas. Puedes tomar varias fotos seguidas con la cámara.
+            </span>
             <div id="previewFotos" class="preview-grid"></div>
           </div>
 
@@ -348,6 +460,8 @@
     let cacheReportesPublicos = [];
     let mostrarTodosLosReportes = false;
     let archivosValidados = [];
+    let mapa = null;
+    let marcador = null;
 
     function escapeHTML(str) {
       return String(str ?? '')
@@ -461,40 +575,21 @@
       return false;
     }
 
-    // --- 3. MAPA INTERACTIVO MAPLIBRE + NOMINATIM ---
-    const centroVeracruz = [-96.1348, 19.1738];
-    const mapa = new maplibregl.Map({
-      container: 'mapaReporte',
-      style: {
-        version: 8,
-        sources: {
-          'osm-tiles': {
-            type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256
-          }
-        },
-        layers: [{ id: 'osm-tiles', type: 'raster', source: 'osm-tiles', minzoom: 10, maxzoom: 19 }]
-      },
-      center: centroVeracruz,
-      zoom: 13
-    });
-
-    const marcador = new maplibregl.Marker({ color: '#691c32', draggable: true })
-      .setLngLat(centroVeracruz)
-      .addTo(mapa);
-
+    // --- 3. MAPA INTERACTIVO MAPLIBRE CON RESPALDO ---
     const inputUbicacion = document.getElementById('ubicacion');
     const lblDireccion = document.getElementById('direccionDetectada');
+    const contenedorMapa = document.getElementById('mapaReporte');
 
     function fijarCoordenadas(lat, lng, etiqueta = '') {
       if (estaEnElMar(lat, lng)) {
         lblDireccion.style.color = '#dc2626';
-        lblDireccion.textContent = '⚠️ El punto seleccionado cae en el mar o fuera de Veracruz. Arrastra el pin a tierra firme.';
+        lblDireccion.textContent = '⚠️ El punto seleccionado cae en el mar o fuera de Veracruz. Selecciona tierra firme.';
         return false;
       }
-      marcador.setLngLat([lng, lat]);
-      mapa.flyTo({ center: [lng, lat], zoom: 16 });
+      if (marcador && mapa) {
+        marcador.setLngLat([lng, lat]);
+        mapa.flyTo({ center: [lng, lat], zoom: 16 });
+      }
       inputUbicacion.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       lblDireccion.style.color = '#166534';
       lblDireccion.textContent = etiqueta
@@ -503,14 +598,62 @@
       return true;
     }
 
-    marcador.on('dragend', () => {
-      const pos = marcador.getLngLat();
-      fijarCoordenadas(pos.lat, pos.lng);
-    });
+    function inicializarMapa(intentos = 0) {
+      if (typeof maplibregl === 'undefined') {
+        if (intentos < 12) {
+          setTimeout(() => inicializarMapa(intentos + 1), 350);
+        } else {
+          contenedorMapa.innerHTML = `
+            <div class="mapa-fallback">
+              <strong>Mapa interactivo no disponible sin conexión externa</strong>
+              <p style="margin:6px 0 0;">Escribe la dirección exacta en el campo de arriba (ej. <em>Av. Díaz Mirón esq. Bolívar, Veracruz</em>) para registrar el reporte.</p>
+            </div>
+          `;
+        }
+        return;
+      }
 
-    mapa.on('click', (e) => {
-      fijarCoordenadas(e.lngLat.lat, e.lngLat.lng);
-    });
+      try {
+        const centroVeracruz = [-96.1348, 19.1738];
+        mapa = new maplibregl.Map({
+          container: 'mapaReporte',
+          style: {
+            version: 8,
+            sources: {
+              'osm-tiles': {
+                type: 'raster',
+                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                tileSize: 256
+              }
+            },
+            layers: [{ id: 'osm-tiles', type: 'raster', source: 'osm-tiles', minzoom: 10, maxzoom: 19 }]
+          },
+          center: centroVeracruz,
+          zoom: 13
+        });
+
+        mapa.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+        marcador = new maplibregl.Marker({ color: '#691c32', draggable: true })
+          .setLngLat(centroVeracruz)
+          .addTo(mapa);
+
+        marcador.on('dragend', () => {
+          const pos = marcador.getLngLat();
+          fijarCoordenadas(pos.lat, pos.lng);
+        });
+
+        mapa.on('click', (e) => {
+          fijarCoordenadas(e.lngLat.lat, e.lngLat.lng);
+        });
+
+        mapa.on('load', () => mapa.resize());
+        setTimeout(() => { if (mapa) mapa.resize(); }, 400);
+        window.addEventListener('resize', () => { if (mapa) mapa.resize(); });
+      } catch (err) {
+        console.error('Error iniciando mapa:', err);
+      }
+    }
 
     inputUbicacion.addEventListener('keydown', async (e) => {
       if (e.key !== 'Enter') return;
@@ -530,10 +673,10 @@
           fijarCoordenadas(lat, lng, resultados[0].display_name);
         } else {
           lblDireccion.style.color = '#d97706';
-          lblDireccion.textContent = 'No se encontró esa calle. Puedes mover el pin rojo directamente en el mapa.';
+          lblDireccion.textContent = 'No se encontró esa calle. Puedes tocar el mapa o escribir la dirección manualmente.';
         }
       } catch (_) {
-        lblDireccion.textContent = 'No se pudo consultar el mapa en línea; mueve el pin manualmente.';
+        lblDireccion.textContent = 'Sin búsqueda en línea; puedes guardar la dirección escrita directamente.';
       }
     });
 
@@ -544,7 +687,7 @@
       }
       navigator.geolocation.getCurrentPosition(
         (pos) => fijarCoordenadas(pos.coords.latitude, pos.coords.longitude, 'Ubicación GPS actual'),
-        () => alert('No se pudo obtener tu ubicación actual.'),
+        () => alert('No se pudo obtener tu ubicación actual (en celulares requiere HTTPS o permisos activos).'),
         { enableHighAccuracy: true, timeout: 10000 }
       );
     });
@@ -556,54 +699,152 @@
       lblChars.textContent = `${txtDesc.value.length} / 1000 caracteres`;
     });
 
-    // --- 5. VALIDACIÓN BINARIA DE IMÁGENES (JPG, PNG, WEBP) ---
-    async function esImagenBinariaValida(file) {
-      if (file.size > 8 * 1024 * 1024) return false;
-      const buffer = await file.slice(0, 12).arrayBuffer();
-      const bytes = new Uint8Array(buffer);
+    // --- 5. CAPTURA DE CÁMARA Y GALERÍA EN CELULAR (COMPRESIÓN AUTOMÁTICA A JPEG) ---
+    const inputCamara = document.getElementById('inputCamara');
+    const inputGaleria = document.getElementById('inputGaleria');
+    const btnAbrirCamara = document.getElementById('btnAbrirCamara');
+    const btnAbrirGaleria = document.getElementById('btnAbrirGaleria');
+    const previewFotos = document.getElementById('previewFotos');
+    const estadoFotos = document.getElementById('estadoFotos');
 
-      // JPEG: FF D8 FF
-      const esJpg = bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF;
-      // PNG: 89 50 4E 47
-      const esPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
-      // WEBP: RIFF....WEBP
-      const esWebp = bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
-                     bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+    /**
+     * Normaliza y comprime cualquier foto tomada por la cámara del teléfono
+     * (incluso fotos de 12+ MP / >8 MB) a un JPEG ligero de máximo 1600px.
+     */
+    function normalizarImagenCamara(file) {
+      return new Promise((resolve, reject) => {
+        const urlTemp = URL.createObjectURL(file);
+        const img = new Image();
 
-      return esJpg || esPng || esWebp;
+        img.onload = () => {
+          try {
+            const MAX_LADO = 1600;
+            let w = img.naturalWidth || img.width;
+            let h = img.naturalHeight || img.height;
+
+            if (w > MAX_LADO || h > MAX_LADO) {
+              if (w >= h) {
+                h = Math.round((h * MAX_LADO) / w);
+                w = MAX_LADO;
+              } else {
+                w = Math.round((w * MAX_LADO) / h);
+                h = MAX_LADO;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+
+            canvas.toBlob(
+              (blob) => {
+                URL.revokeObjectURL(urlTemp);
+                if (!blob) {
+                  reject(new Error('No se pudo procesar la imagen.'));
+                  return;
+                }
+                const nombreLimpio = 'evidencia_' + Date.now() + '_' + Math.floor(Math.random() * 1000) + '.jpg';
+                const archivoJpg = new File([blob], nombreLimpio, { type: 'image/jpeg' });
+                resolve(archivoJpg);
+              },
+              'image/jpeg',
+              0.84
+            );
+          } catch (err) {
+            URL.revokeObjectURL(urlTemp);
+            reject(err);
+          }
+        };
+
+        img.onerror = () => {
+          URL.revokeObjectURL(urlTemp);
+          // Respaldo: si el navegador no pudo decodificarla en canvas pero pesa <= 8 MB, devolver original
+          if (file.size <= 8 * 1024 * 1024) {
+            resolve(file);
+          } else {
+            reject(new Error('Formato de imagen no soportado o archivo demasiado pesado.'));
+          }
+        };
+
+        img.src = urlTemp;
+      });
     }
 
-    const inputEvidencia = document.getElementById('evidencia');
-    const previewFotos = document.getElementById('previewFotos');
-
-    inputEvidencia.addEventListener('change', async () => {
+    function renderizarPrevisualizacionFotos() {
       previewFotos.innerHTML = '';
-      archivosValidados = [];
-      const seleccionados = Array.from(inputEvidencia.files || []);
+      estadoFotos.textContent = `${archivosValidados.length} de 3 fotos agregadas.`;
 
-      if (seleccionados.length > 3) {
-        alert('Solo puedes subir máximo 3 fotografías por reporte.');
-        inputEvidencia.value = '';
-        return;
-      }
+      const lleno = archivosValidados.length >= 3;
+      btnAbrirCamara.disabled = lleno;
+      btnAbrirGaleria.disabled = lleno;
 
-      for (const archivo of seleccionados) {
-        const valido = await esImagenBinariaValida(archivo);
-        if (!valido) {
-          alert(`El archivo "${archivo.name}" no es una imagen JPG/PNG/WEBP válida o supera los 8 MB.`);
-          inputEvidencia.value = '';
-          previewFotos.innerHTML = '';
-          archivosValidados = [];
-          return;
-        }
-        archivosValidados.push(archivo);
+      archivosValidados.forEach((archivo, idx) => {
+        const item = document.createElement('div');
+        item.className = 'preview-item';
 
         const img = document.createElement('img');
         img.src = URL.createObjectURL(archivo);
-        img.alt = archivo.name;
-        previewFotos.appendChild(img);
+        img.alt = `Evidencia ${idx + 1}`;
+
+        const btnDel = document.createElement('button');
+        btnDel.type = 'button';
+        btnDel.className = 'btn-quitar-foto';
+        btnDel.textContent = '✕';
+        btnDel.title = 'Quitar foto';
+        btnDel.addEventListener('click', () => {
+          archivosValidados.splice(idx, 1);
+          renderizarPrevisualizacionFotos();
+        });
+
+        item.appendChild(img);
+        item.appendChild(btnDel);
+        previewFotos.appendChild(item);
+      });
+    }
+
+    async function procesarNuevosArchivos(listaFiles) {
+      const nuevos = Array.from(listaFiles || []);
+      if (nuevos.length === 0) return;
+
+      const espacioDisponible = 3 - archivosValidados.length;
+      if (espacioDisponible <= 0) {
+        alert('Ya tienes el máximo de 3 fotografías.');
+        return;
       }
+
+      const aProcesar = nuevos.slice(0, espacioDisponible);
+      if (nuevos.length > espacioDisponible) {
+        alert(`Solo se agregaron ${espacioDisponible} foto(s) para no exceder el máximo de 3.`);
+      }
+
+      estadoFotos.textContent = 'Procesando fotografía...';
+
+      for (const archivo of aProcesar) {
+        try {
+          const optimizado = await normalizarImagenCamara(archivo);
+          archivosValidados.push(optimizado);
+        } catch (err) {
+          alert(`No se pudo cargar "${archivo.name}": ${err.message}`);
+        }
+      }
+
+      renderizarPrevisualizacionFotos();
+    }
+
+    btnAbrirCamara.addEventListener('click', () => {
+      inputCamara.value = '';
+      inputCamara.click();
     });
+
+    btnAbrirGaleria.addEventListener('click', () => {
+      inputGaleria.value = '';
+      inputGaleria.click();
+    });
+
+    inputCamara.addEventListener('change', (e) => procesarNuevosArchivos(e.target.files));
+    inputGaleria.addEventListener('change', (e) => procesarNuevosArchivos(e.target.files));
 
     // --- 6. ENVÍO DEL FORMULARIO ---
     const formReporte = document.getElementById('formReporte');
@@ -628,7 +869,7 @@
       }
 
       if (archivosValidados.length === 0 || archivosValidados.length > 3) {
-        mostrarAlerta('err', 'Debes adjuntar entre 1 y 3 fotografías válidas.');
+        mostrarAlerta('err', 'Debes tomar o adjuntar entre 1 y 3 fotografías de evidencia.');
         return;
       }
 
@@ -639,7 +880,7 @@
       fd.append('tipo_incidencia', document.getElementById('tipo_incidencia').value);
       fd.append('ubicacion', ubicacionVal);
       fd.append('descripcion', txtDesc.value.trim());
-      archivosValidados.forEach(file => fd.append('evidencia[]', file));
+      archivosValidados.forEach(file => fd.append('evidencia[]', file, file.name));
 
       try {
         const res = await fetch(API_REPORTES, { method: 'POST', body: fd });
@@ -652,11 +893,11 @@
             `<a href="Reporte.php?folio=${encodeURIComponent(data.folio)}" style="color:#166534; text-decoration:underline;">Ver seguimiento</a>`
           );
           formReporte.reset();
-          previewFotos.innerHTML = '';
           archivosValidados = [];
+          renderizarPrevisualizacionFotos();
           lblChars.textContent = '0 / 1000 caracteres';
           lblDireccion.style.color = '#6b7280';
-          lblDireccion.textContent = 'Presiona Enter tras escribir una calle para ubicarla en el mapa, o arrastra el marcador rojo.';
+          lblDireccion.textContent = 'Toca el mapa, arrastra el marcador rojo o escribe una calle y presiona Enter.';
           await cargarReportesBD();
         } else {
           mostrarAlerta('err', escapeHTML(data.error || 'No se pudo registrar el reporte.'));
@@ -669,17 +910,17 @@
       }
     });
 
-    document.addEventListener('DOMContentLoaded', cargarReportesBD);
+    document.addEventListener('DOMContentLoaded', () => {
+      cargarReportesBD();
+      inicializarMapa();
+    });
   </script>
 
-  <?php include __DIR__ . '/chat_ia.php'; ?>
-</body>
-</html>
-
-<?php
+  <?php
   $widgetIA = __DIR__ . '/chat_ia.php';
   if (file_exists($widgetIA)) {
       include $widgetIA;
   }
   ?>
 </body>
+</html>

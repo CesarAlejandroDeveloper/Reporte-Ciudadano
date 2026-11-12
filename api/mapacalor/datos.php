@@ -1,10 +1,30 @@
 <?php
 /**
- * datos.php — Entrega a mapacalor/index.html los reportes que tienen ubicación.
- * Solo lectura. No expone teléfonos ni nombres de ciudadanos.
- * Ruta: C:\xampp\htdocs\api\mapacalor\datos.php
+ * datos.php · Entrega a mapacalor/index.php los reportes que tienen ubicación.
+ * Solo lectura y protegido por sesión.
  */
 declare(strict_types=1);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+$sesionValida = !empty($_SESSION['usuario'])
+    || !empty($_SESSION['usuario_id'])
+    || !empty($_SESSION['user_id'])
+    || !empty($_SESSION['id_usuario'])
+    || !empty($_SESSION['admin'])
+    || !empty($_SESSION['rol'])
+    || !empty($_SESSION['user'])
+    || !empty($_SESSION['logueado']);
+
+if (!$sesionValida) {
+    http_response_code(401);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'No autorizado. Inicia sesión como dependencia.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
@@ -15,12 +35,16 @@ const DB_PASS = '';
 
 try {
     $pdo = new PDO(
-        'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4', DB_USER, DB_PASS,
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
+        'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
+        DB_USER,
+        DB_PASS,
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+        ]
     );
 
     $total = (int)$pdo->query('SELECT COUNT(*) FROM reportes')->fetchColumn();
-
     $filas = $pdo->query(
         'SELECT id, folio, titulo, descripcion, categoria, prioridad, estatus, latitud, longitud, fecha_creacion
          FROM reportes
@@ -44,8 +68,10 @@ try {
         'fecha'       => $r['fecha_creacion'],
     ], $filas);
 
-    echo json_encode(['total' => $total, 'con_ubicacion' => count($reportes), 'reportes' => $reportes],
-        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo json_encode(
+        ['total' => $total, 'con_ubicacion' => count($reportes), 'reportes' => $reportes],
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+    );
 } catch (Throwable $e) {
     error_log('mapacalor/datos.php: ' . $e->getMessage());
     http_response_code(500);
