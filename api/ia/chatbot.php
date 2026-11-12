@@ -1,15 +1,18 @@
 <?php
 /**
  * chatbot.php — API del chatbot "Respondin"
+ * Ruta: C:\xampp\htdocs\api\ia\chatbot.php
  *
  * POST (JSON o multipart/form-data):
  *   session_id        (vacío en el primer mensaje)
- *   acepta_terminos   true  (obligatorio al iniciar sesión)
  *   mensaje           texto del ciudadano
- *   latitud, longitud (opcional, GPS)
- *   foto              (opcional, archivo jpg/png/webp ≤ 5 MB)
+ *   latitud, longitud (ubicación elegida en el mapa)
+ *   foto              (archivo jpg/png/webp ≤ 5 MB)
+ *   accion=historial  (con session_id) devuelve la conversación para retomarla
  *
- * Respuesta: { session_id, respuesta, folio?, estatus?, emergencia?, faltan[] }
+ * Respuesta: { session_id, respuesta, accion?, folio?, estatus?, emergencia?, faltan[] }
+ *   accion: "foto" | "ubicacion" | "confirmar" → el chat muestra el botón correspondiente.
+ * Un reporte solo se registra con: descripción, nombre, teléfono, foto, ubicación y confirmación.
  */
 require __DIR__ . '/config.php';
 require __DIR__ . '/prompts.php';
@@ -38,13 +41,35 @@ function emergencia_por_palabras(string $t): ?string {
     return null;
 }
 
+/** Lo que aún falta, en el orden en que se pide. */
+function faltantes(array $d): array {
+    $f = [];
+    if (empty($d['descripcion'])) $f[] = 'descripcion';
+    if (empty($d['nombre']))      $f[] = 'nombre';
+    if (empty($d['telefono']))    $f[] = 'telefono';
+    if (empty($d['foto_url']))    $f[] = 'foto';
+    if (!isset($d['latitud'], $d['longitud'])) $f[] = 'ubicacion';
+    return $f;
+}
+
+/** Botón que debe mostrar el chat según lo que sigue. */
+function accion_de(array $faltan): ?string {
+    $p = $faltan[0] ?? 'confirmar';
+    return in_array($p, ['foto', 'ubicacion', 'confirmar'], true) ? $p : null;
+}
+
 /** Pregunta determinista (no depende del modelo): pide lo que falta o pide confirmar. */
 function pregunta_siguiente(array $d, array $faltan): string {
-    if (in_array('descripcion', $faltan, true)) return 'Cuéntame qué problema quieres reportar y en qué lugar está, o qué trámite necesitas consultar.';
-    if (in_array('nombre', $faltan, true))      return '¿Cuál es tu nombre?';
-    if (in_array('telefono', $faltan, true))    return '¿Cuál es tu número de WhatsApp (10 dígitos) para avisarte del avance?';
+    switch ($faltan[0] ?? '') {
+        case 'descripcion': return 'Cuéntame qué problema quieres reportar o qué trámite necesitas consultar.';
+        case 'nombre':      return '¿Cuál es tu nombre?';
+        case 'telefono':    return ($d['nombre'] ? "Mucho gusto, {$d['nombre']}. " : '')
+                                 . '¿Cuál es tu número de WhatsApp (10 dígitos) para darte seguimiento?';
+        case 'foto':        return 'Ahora necesito una foto como evidencia. Usa el botón de abajo para tomarla o subirla desde tu dispositivo.';
+        case 'ubicacion':   return 'Por último, indícame dónde está el problema. Usa el botón de abajo para elegir la ubicación en el mapa o usar tu ubicación actual.';
+    }
     $que = $d['titulo'] ?? mb_substr($d['descripcion'] ?? '', 0, 120);
-    return "Resumen: $que. A nombre de {$d['nombre']}, WhatsApp {$d['telefono']}. ¿Confirmas que lo registre?";
+    return "Resumen: $que. A nombre de {$d['nombre']}, WhatsApp {$d['telefono']}, con foto y ubicación en el mapa. ¿Confirmas que lo registre?";
 }
 
 function registrar_reporte(PDO $pdo, array $d): array {
@@ -89,7 +114,6 @@ try {
     $pdo     = db();
     $mensaje = trim((string)($in['mensaje'] ?? ''));
     $sid     = preg_replace('/[^a-zA-Z0-9]/', '', (string)($in['session_id'] ?? ''));
-    $acepta  = filter_var($in['acepta_terminos'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
     // ---- Sesión ----
     $conv = null;
@@ -98,8 +122,19 @@ try {
         $st->execute([$sid]);
         $conv = $st->fetch() ?: null;
     }
-    if (!$conv) {
-        if (!$acepta) json_out(['requiere_terminos' => true, 'respuesta' => AVISO_TERMINOS]);
+
+    // ---- Retomar conversación (el chat lo pide al recargar la página) ----
+    if (($in['accion'] ?? '') === 'historial') {
+        if (!$conv) json_out(['existe' => false]);
+        $d  = json_decode($conv['datos'], true) ?: [];
+        $st = $pdo->prepare('SELECT rol, contenido FROM (SELECT id, rol, contenido FROM mensajes
+                             WHERE conversacion_id = ? ORDER BY id DESC LIMIT 50) t ORDER BY id');
+        $st->execute([(int)$conv['id']]);
+        json_out(['existe' => true, 'session_id' => $sid, 'mensajes' => $st->fetchAll(),
+                  'accion' => !empty($d['descripcion']) ? accion_de(faltantes($d)) : null]);
+    }
+
+    if (!$conv) {   // usar el servicio implica aceptar términos y aviso de privacidad
         $sid = bin2hex(random_bytes(16));
         $pdo->prepare('INSERT INTO conversaciones (session_id, datos, acepto_terminos, ip) VALUES (?,?,1,?)')
             ->execute([$sid, '{}', $_SERVER['REMOTE_ADDR'] ?? null]);
@@ -112,7 +147,7 @@ try {
     $convId = (int)$conv['id'];
     $datos  = json_decode($conv['datos'], true) ?: [];
 
-    // ---- Adjuntos (foto / ubicación) ----
+    // ---- Adjuntos (foto / ubicación del mapa) ----
     $adjunto = '';
     if (!empty($_FILES['foto']) && $_FILES['foto']['error'] === UPLOAD_ERR_OK) {
         $f    = $_FILES['foto'];
@@ -121,19 +156,25 @@ try {
         if ($ext && $f['size'] <= 5 * 1024 * 1024) {
             $nombre = date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
             if (move_uploaded_file($f['tmp_name'], __DIR__ . '/uploads/' . $nombre)) {
-                $datos['foto_url'] = 'api/uploads/' . $nombre;
-                $adjunto .= ' [El ciudadano adjuntó una foto]';
+                $datos['foto_url'] = 'api/ia/uploads/' . $nombre;   // ruta desde htdocs
+                $adjunto .= '[El ciudadano adjuntó una foto]';
             }
         }
     }
-    if (isset($in['latitud'], $in['longitud']) && is_numeric($in['latitud']) && is_numeric($in['longitud'])) {
+    if (isset($in['latitud'], $in['longitud']) && is_numeric($in['latitud']) && is_numeric($in['longitud'])
+        && abs((float)$in['latitud']) <= 90 && abs((float)$in['longitud']) <= 180) {
         $datos['latitud']  = round((float)$in['latitud'], 7);
         $datos['longitud'] = round((float)$in['longitud'], 7);
-        $adjunto .= ' [El ciudadano compartió su ubicación GPS]';
+        $adjunto .= ($adjunto ? ' ' : '') . '[El ciudadano eligió la ubicación en el mapa]';
     }
     if ($mensaje === '' && $adjunto === '') json_out(['error' => 'Mensaje vacío'], 400);
+    $soloAdjunto = ($mensaje === '');
     $mensaje = mb_substr($mensaje, 0, 1000);
-    guardar_msg($pdo, $convId, 'user', trim($mensaje . $adjunto));
+    guardar_msg($pdo, $convId, 'user', trim($mensaje . ' ' . $adjunto));
+
+    // ---- Cambiar foto o ubicación ya enviadas ----
+    if (preg_match('/(otra|cambiar|corregir|nueva).{0,20}(foto|imagen)/iu', $mensaje)) unset($datos['foto_url']);
+    if (preg_match('/(otra|cambiar|corregir|nueva).{0,20}(ubicaci|mapa)/iu', $mensaje)) unset($datos['latitud'], $datos['longitud']);
 
     // ---- Consulta de folio ----
     $contexto = '';
@@ -146,29 +187,37 @@ try {
                        : "El folio $folio no existe en el sistema.";
     }
 
-    // ---- Historial reciente + IA ----
+    // ---- Historial reciente + IA (se omite si solo llegó una foto o ubicación) ----
     $st = $pdo->prepare('SELECT rol, contenido FROM mensajes WHERE conversacion_id = ? ORDER BY id DESC LIMIT 12');
     $st->execute([$convId]);
     $hist = array_reverse($st->fetchAll());
-    $msgs = [['role' => 'system', 'content' => prompt_sistema($datos, $contexto)]];
-    foreach ($hist as $h) $msgs[] = ['role' => $h['rol'], 'content' => $h['contenido']];
 
-    try {
-        $raw = ollama_chat($msgs, true);
-    } catch (Throwable $e) {
-        $sos = preg_match('/herid|sangr|incendio|fuego|humo|balacera|disparo|explosi|\bgas\b|inconsciente|infarto|secuestro|asalt|me est[aá]n robando/iu', $mensaje)
-            ? "🚨 Si hay personas en peligro, llama al 911 ahora mismo.\n" : '';
-        json_out(['session_id' => $sid, 'respuesta' => $sos . 'Tengo un problema técnico en este momento. Intenta de nuevo en unos segundos.', 'error' => $e->getMessage()], 503);
+    $respuesta = '';
+    $nuevo     = [];
+    if (!$soloAdjunto) {
+        $msgs = [['role' => 'system', 'content' => prompt_sistema($datos, $contexto)]];
+        foreach ($hist as $h) $msgs[] = ['role' => $h['rol'], 'content' => $h['contenido']];
+        try {
+            $raw = ollama_chat($msgs, true);
+        } catch (Throwable $e) {
+            error_log('chatbot.php (Ollama): ' . $e->getMessage());
+            $sos = preg_match('/herid|sangr|incendio|fuego|humo|balacera|disparo|explosi|\bgas\b|inconsciente|infarto|secuestro|asalt|me est[aá]n robando/iu', $mensaje)
+                ? "🚨 Si hay personas en peligro, llama al 911 ahora mismo.\n" : '';
+            json_out(['session_id' => $sid, 'respuesta' => $sos . 'Tengo un problema técnico en este momento. Intenta de nuevo en unos segundos.'], 503);
+        }
+        $j         = json_decode($raw, true);
+        $respuesta = is_array($j) && !empty($j['respuesta']) && is_string($j['respuesta']) ? trim($j['respuesta']) : '';
+        if (!is_array($j) && $raw !== '' && $raw[0] !== '{' && $raw[0] !== '[') $respuesta = $raw;   // texto plano
+        if ($respuesta !== '' && (mb_strlen($respuesta) < 3 || $respuesta[0] === '{')) $respuesta = '';   // {} o basura
+        $nuevo     = is_array($j) && is_array($j['datos'] ?? null) ? $j['datos'] : [];
     }
-    $j         = json_decode($raw, true);
-    $respuesta = is_array($j) && !empty($j['respuesta']) && is_string($j['respuesta']) ? trim($j['respuesta']) : '';
-    if (!is_array($j) && $raw !== '' && $raw[0] !== '{' && $raw[0] !== '[') $respuesta = $raw;   // texto plano
-    if ($respuesta !== '' && (mb_strlen($respuesta) < 3 || $respuesta[0] === '{')) $respuesta = '';   // {} o basura
-    $nuevo     = is_array($j) && is_array($j['datos'] ?? null) ? $j['datos'] : [];
 
     // ---- Validar y mezclar datos ----
     foreach (['nombre', 'titulo', 'descripcion', 'referencia_ubicacion'] as $k) {
         if (!empty($nuevo[$k]) && is_string($nuevo[$k])) $datos[$k] = mb_substr(trim($nuevo[$k]), 0, 600);
+    }
+    if (!empty($datos['titulo']) && preg_match('/asistente|respondin|ciudad (que responde|reporta)/iu', $datos['titulo'])) {
+        unset($datos['titulo']);   // el modelo a veces copia su propio rol como título
     }
     if (!empty($nuevo['telefono'])) {
         $t = preg_replace('/\D/', '', (string)$nuevo['telefono']);
@@ -178,19 +227,22 @@ try {
     if (in_array($nuevo['prioridad'] ?? null, PRIORIDADES, true))  $datos['prioridad'] = $nuevo['prioridad'];
     if (in_array($nuevo['emergencia'] ?? null, ['policia', 'bomberos', 'ambulancia'], true)) {
         $datos['emergencia'] = $nuevo['emergencia'];
-        $datos['prioridad']  = 'urgente';
     }
+
     // ---- Respaldo por reglas: los modelos chicos fallan en esto, así que PHP lo asegura ----
     $ultimoBot = '';
     foreach (array_reverse($hist) as $h) { if ($h['rol'] === 'assistant') { $ultimoBot = $h['contenido']; break; } }
+
+    $esPregunta = $mensaje !== '' && (str_contains($mensaje, '?') || str_contains($mensaje, '¿')
+        || preg_match('/^\s*(hola|buen[oa]s|gracias|ayuda|qui[eé]n(es)? (eres|son))\b/iu', $mensaje));
 
     if (preg_match('/(?<!\d)(\d(?:[\s\-.]?\d){9,12})(?!\d)/', $mensaje, $m)) {
         $t = preg_replace('/\D/', '', $m[1]);
         if (strlen($t) >= 10 && strlen($t) <= 13) $datos['telefono'] = $t;
     }
-    $cat      = categoria_por_palabras($mensaje);
-    $sosArea  = emergencia_por_palabras($mensaje);
-    if (empty($datos['nombre']) && !$cat && !$sosArea && preg_match('/nombre/iu', $ultimoBot)) {
+    $cat     = categoria_por_palabras($mensaje);
+    $sosArea = emergencia_por_palabras($mensaje);
+    if (empty($datos['nombre']) && !$cat && !$sosArea && !$esPregunta && preg_match('/nombre/iu', $ultimoBot)) {
         $limpio = trim(preg_replace('/^(me llamo|mi nombre es|soy)\s+/iu', '', $mensaje), " .,!");
         if (preg_match('/^[\p{L}\' -]{2,60}$/u', $limpio) && count(preg_split('/\s+/u', $limpio)) <= 4) {
             $datos['nombre'] = mb_convert_case($limpio, MB_CASE_TITLE, 'UTF-8');
@@ -198,54 +250,66 @@ try {
     }
     if (!empty($datos['descripcion']) && empty($datos['referencia_ubicacion']) && !$cat && !$sosArea
         && preg_match('/ubicaci|d[oó]nde|calle|direcci|referencia/iu', $ultimoBot) && mb_strlen($mensaje) <= 200) {
-        $datos['referencia_ubicacion'] = $mensaje;   // la persona contestó dónde está
+        $datos['referencia_ubicacion'] = $mensaje;   // la persona dio una referencia escrita
     }
     if ($cat && empty($datos['categoria']))   $datos['categoria']   = $cat;
     if ($cat && empty($datos['descripcion'])) $datos['descripcion'] = mb_substr($mensaje, 0, 600);
     if ($sosArea) {
         $datos['emergencia'] = $sosArea;
-        $datos['prioridad']  = 'urgente';
         if (empty($datos['descripcion'])) $datos['descripcion'] = mb_substr($mensaje, 0, 600);
     }
+    // Mensaje largo que no es pregunta ni saludo y el modelo no extrajo descripción: se toma tal cual
+    if (empty($datos['descripcion']) && !$esPregunta && !$soloAdjunto && mb_strlen($mensaje) >= 15) {
+        $datos['descripcion'] = mb_substr($mensaje, 0, 600);
+    }
     if (!empty($datos['descripcion']) && empty($datos['categoria'])) $datos['categoria'] = 'otro';
+    // "urgente" solo se asigna con emergencia (el modelo chico lo ponía sin motivo)
+    if (!empty($datos['emergencia'])) $datos['prioridad'] = 'urgente';
+    elseif (($datos['prioridad'] ?? '') === 'urgente') $datos['prioridad'] = 'alta';
 
-    // La confirmación la decide PHP: el bot preguntó "¿Confirmas…?" y la persona dijo que sí
-    $confirmado = (bool)preg_match('/confirmas/iu', $ultimoBot)
-        && (bool)preg_match('/^\s*(s[ií]|sip|claro|confirmo|correcto|ok|dale|adelante)([\s.,!]+.*)?$/iu', $mensaje);
+    // ---- Confirmación: la decide PHP (solo un "sí" claro, sin correcciones) ----
+    $preguntoConfirmar = (bool)preg_match('/confirmas/iu', $ultimoBot);
+    $dijoSi = $preguntoConfirmar && (bool)preg_match(
+        '/^\s*(s[ií]|sip|claro|confirmo|correcto|ok|dale|adelante|reg[ií]stralo)[\s.,!]*(confirmo|reg[ií]stralo)?[\s.,!]*$/iu', $mensaje);
+    $niega  = $preguntoConfirmar && (bool)preg_match('/^\s*(no|cambiar|corregir|espera|ahora no)\b/iu', $mensaje);
 
-    $faltan = [];
-    foreach (['descripcion', 'nombre', 'telefono'] as $k) if (empty($datos[$k])) $faltan[] = $k;
+    $faltan     = faltantes($datos);
+    $confirmado = $dijoSi && $faltan === [];
+    $enFlujo    = !empty($datos['descripcion']);
+    $siguiente  = pregunta_siguiente($datos, $faltan);
+
+    // ---- Qué responder (siempre con sentido respecto al mensaje) ----
+    if ($soloAdjunto)                         $respuesta = $siguiente;
+    elseif ($niega)                           $respuesta = 'De acuerdo, ¿qué quieres corregir: el problema, tu nombre, tu teléfono, la foto o la ubicación?';
+    elseif ($confirmado)                      { /* se registra abajo */ }
+    elseif (!$enFlujo)                        { if ($respuesta === '') $respuesta = $siguiente; }
+    elseif ($esPregunta && $respuesta !== '') $respuesta .= "\n\n" . $siguiente;   // contesta su duda y retoma el reporte
+    else                                      $respuesta = $siguiente;
 
     $out = ['session_id' => $sid];
-    $emergencia = $datos['emergencia'] ?? null;
 
-    if ($respuesta === '') {
-        $respuesta = pregunta_siguiente($datos, $faltan);
-    } elseif ($faltan === [] && !$confirmado && !$emergencia) {
-        $respuesta = pregunta_siguiente($datos, []);   // PHP fuerza pedir la confirmación
-    }
-
-    // ---- ¿Registrar? (completo + confirmado, o emergencia con descripción) ----
-    $registrar = !empty($datos['descripcion']) && (($faltan === [] && $confirmado) || $emergencia);
+    // ---- Registrar: todo completo y confirmado ----
+    $registrar = $confirmado;
     if ($registrar) {
-        if (empty($datos['categoria'])) $datos['categoria'] = $emergencia ? 'seguridad' : 'otro';
         $rep = registrar_reporte($pdo, $datos);
-        $respuesta = "✅ Tu reporte quedó registrado con el folio {$rep['folio']}. Estatus: reporte recibido."
-            . (!empty($datos['telefono']) ? " Te avisaremos por WhatsApp al {$datos['telefono']} en cada cambio." : '');
+        $respuesta = "✅ Tu reporte quedó registrado con el folio {$rep['folio']}. Estatus: reporte recibido. "
+            . "Te daremos seguimiento por WhatsApp al {$datos['telefono']}.";
         $out += ['folio' => $rep['folio'], 'estatus' => 'reporte recibido'];
         // limpiar lo propio del reporte; se conservan nombre y teléfono
         foreach (['titulo','descripcion','categoria','prioridad','referencia_ubicacion','latitud','longitud','foto_url','emergencia'] as $k) unset($datos[$k]);
     }
-    if ($emergencia) {
-        $out['emergencia'] = $emergencia;
-        $respuesta = "🚨 Esto parece una emergencia ($emergencia). Llama al 911 ahora mismo.\n" . $respuesta;
+    if ($sosArea) {
+        $out['emergencia'] = $sosArea;
+        $respuesta = "🚨 Esto parece una emergencia ($sosArea). Llama al 911 ahora mismo.\n" . $respuesta;
     }
 
     guardar_msg($pdo, $convId, 'assistant', $respuesta);
     $pdo->prepare('UPDATE conversaciones SET datos = ? WHERE id = ?')
         ->execute([json_encode($datos, JSON_UNESCAPED_UNICODE), $convId]);
 
+    $out['accion'] = ($registrar || $niega) ? null : accion_de($faltan);
     json_out($out + ['respuesta' => $respuesta, 'faltan' => $registrar ? [] : $faltan]);
 } catch (Throwable $e) {
-    json_out(['error' => 'Error interno', 'detalle' => $e->getMessage()], 500);
+    error_log('chatbot.php: ' . $e->getMessage());
+    json_out(['error' => 'Error interno. Intenta de nuevo en unos segundos.'], 500);
 }

@@ -103,3 +103,11 @@
 
 </body>
 </html>
+
+<?php
+  $widgetIA = __DIR__ . '/chat_ia.php';
+  if (file_exists($widgetIA)) {
+      include $widgetIA;
+  }
+  ?>
+</body>

@@ -1,6 +1,10 @@
 <?php
 require_once __DIR__ . '/../modelo/config.php';
 
+if (!defined('COOLDOWN_SEGUNDOS_DISPOSITIVO')) define('COOLDOWN_SEGUNDOS_DISPOSITIVO', 3);
+if (!defined('MAX_REPORTES_POR_HORA_DISPOSITIVO')) define('MAX_REPORTES_POR_HORA_DISPOSITIVO', 50);
+if (!defined('BLOQUEAR_DUPLICADOS_ZONA')) define('BLOQUEAR_DUPLICADOS_ZONA', false);
+
 class ReporteController {
     private $db;
 
@@ -185,16 +189,27 @@ class ReporteController {
 
             if ($esAdmin && !isset($_GET['publico'])) {
                 $stmt = $this->db->prepare("SELECT * FROM reportes ORDER BY id DESC");
+                $stmt->execute();
             } else {
-                $stmt = $this->db->prepare(
-                    "SELECT id, folio, titulo, descripcion, categoria, prioridad, latitud, longitud, foto_url, estatus, fecha_creacion 
-                     FROM reportes 
-                     WHERE LOWER(estatus) NOT IN ('denegada', 'cancelado') 
-                     ORDER BY id DESC"
-                );
+                $limite = (isset($_GET['limit']) && is_numeric($_GET['limit']))
+                    ? max(1, min(100, intval($_GET['limit'])))
+                    : null;
+
+                $sql = "SELECT id, folio, titulo, descripcion, categoria, prioridad, latitud, longitud, foto_url, estatus, fecha_creacion 
+                        FROM reportes 
+                        WHERE LOWER(estatus) NOT IN ('denegada', 'cancelado') 
+                        ORDER BY id DESC";
+
+                if ($limite !== null) {
+                    $sql .= " LIMIT :limite";
+                    $stmt = $this->db->prepare($sql);
+                    $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
+                } else {
+                    $stmt = $this->db->prepare($sql);
+                }
+                $stmt->execute();
             }
 
-            $stmt->execute();
             $reportes = $stmt->fetchAll();
 
             foreach ($reportes as &$rep) {
@@ -217,7 +232,7 @@ class ReporteController {
             session_start();
         }
 
-        // 1. Control flexible por dispositivo/sesión (permite hasta MAX_REPORTES_POR_HORA_DISPOSITIVO)
+        // 1. Control flexible por dispositivo/sesión
         $ahora = time();
         $historialEnvios = $_SESSION['historial_reportes_ts'] ?? [];
         $historialEnvios = array_values(array_filter($historialEnvios, fn($ts) => ($ahora - $ts) < 3600));
@@ -268,7 +283,7 @@ class ReporteController {
             $longitud = $coordenadas[2];
         }
 
-        // 4. Verificación de duplicados por zona (desactivada por defecto para permitir acumulación en Mapa de Calor)
+        // 4. Verificación de duplicados por zona (opcional)
         if (BLOQUEAR_DUPLICADOS_ZONA) {
             try {
                 if ($latitud !== null && $longitud !== null) {
@@ -296,7 +311,9 @@ class ReporteController {
                         return;
                     }
                 }
-            } catch (PDOException $e) {}
+            } catch (PDOException $e) {
+                // Ignorar error auxiliar
+            }
         }
 
         // 5. Validar y guardar de 1 a 3 imágenes reales
@@ -341,7 +358,9 @@ class ReporteController {
 
         foreach ($archivos as $idx => $archivo) {
             if ($archivo['error'] !== UPLOAD_ERR_OK || $archivo['size'] > 8 * 1024 * 1024) {
-                foreach ($archivosFisicos as $f) { @unlink($f); }
+                foreach ($archivosFisicos as $f) {
+                    @unlink($f);
+                }
                 http_response_code(400);
                 echo json_encode(["error" => "La imagen #" . ($idx + 1) . " es inválida o supera los 8 MB."]);
                 return;
@@ -349,7 +368,9 @@ class ReporteController {
 
             $mimeReal = $finfo->file($archivo['tmp_name']);
             if (!isset($mimesPermitidos[$mimeReal]) || @getimagesize($archivo['tmp_name']) === false) {
-                foreach ($archivosFisicos as $f) { @unlink($f); }
+                foreach ($archivosFisicos as $f) {
+                    @unlink($f);
+                }
                 http_response_code(400);
                 echo json_encode(["error" => "El archivo #" . ($idx + 1) . " no es una imagen válida (solo JPG, PNG o WEBP)."]);
                 return;
@@ -362,7 +383,9 @@ class ReporteController {
                 $archivosFisicos[] = $rutaDestino;
                 $rutasGuardadas[] = 'uploads/' . $nombreArchivo;
             } else {
-                foreach ($archivosFisicos as $f) { @unlink($f); }
+                foreach ($archivosFisicos as $f) {
+                    @unlink($f);
+                }
                 http_response_code(500);
                 echo json_encode(["error" => "No se pudo guardar una de las imágenes en el servidor."]);
                 return;
@@ -422,7 +445,9 @@ class ReporteController {
             try {
                 $this->db->prepare("INSERT INTO historial_estatus (reporte_id, estatus) VALUES (?, 'reporte recibido')")
                          ->execute([$reporteId]);
-            } catch (PDOException $e) {}
+            } catch (PDOException $e) {
+                // Ignorar si no existe la tabla auxiliar
+            }
 
             $historialEnvios[] = time();
             $_SESSION['historial_reportes_ts'] = $historialEnvios;
@@ -438,14 +463,18 @@ class ReporteController {
             ], JSON_UNESCAPED_UNICODE);
 
         } catch (Throwable $e) {
-            foreach ($archivosFisicos as $f) { @unlink($f); }
+            foreach ($archivosFisicos as $f) {
+                @unlink($f);
+            }
             http_response_code(500);
             echo json_encode(["error" => "Error al registrar el reporte: " . $e->getMessage()]);
         }
     }
 
     private function eliminarArchivosReporte(?string $fotoUrl): void {
-        if (empty($fotoUrl)) return;
+        if (empty($fotoUrl)) {
+            return;
+        }
 
         $fotos = json_decode($fotoUrl, true);
         if (!is_array($fotos)) {
@@ -453,10 +482,14 @@ class ReporteController {
         }
 
         $uploadsDir = realpath(__DIR__ . '/../uploads');
-        if (!$uploadsDir) return;
+        if (!$uploadsDir) {
+            return;
+        }
 
         foreach ($fotos as $ruta) {
-            if (!is_string($ruta) || $ruta === '') continue;
+            if (!is_string($ruta) || $ruta === '') {
+                continue;
+            }
             $archivoLocal = realpath(__DIR__ . '/../' . ltrim($ruta, '/'));
             if ($archivoLocal && strpos($archivoLocal, $uploadsDir) === 0 && is_file($archivoLocal)) {
                 @unlink($archivoLocal);
@@ -482,7 +515,9 @@ class ReporteController {
             $ids = array_values(array_unique(array_filter(array_map('intval', $data['ids']), fn($v) => $v > 0)));
         } elseif (isset($data['id'])) {
             $idUnico = intval($data['id']);
-            if ($idUnico > 0) $ids[] = $idUnico;
+            if ($idUnico > 0) {
+                $ids[] = $idUnico;
+            }
         }
 
         $estatus = $this->normalizarEstatus((string)($data['estatus'] ?? ''));
@@ -507,7 +542,9 @@ class ReporteController {
                 try {
                     $this->db->prepare("DELETE FROM notificaciones WHERE reporte_id IN ($placeholders)")->execute($ids);
                     $this->db->prepare("DELETE FROM historial_estatus WHERE reporte_id IN ($placeholders)")->execute($ids);
-                } catch (PDOException $e) {}
+                } catch (PDOException $e) {
+                    // Ignorar si no existen las tablas auxiliares
+                }
 
                 $stmtDel = $this->db->prepare("DELETE FROM reportes WHERE id IN ($placeholders)");
                 $stmtDel->execute($ids);
@@ -562,7 +599,9 @@ class ReporteController {
                         $msgWa = "CiudadReporta: Tu reporte {$info['folio']} cambió de estatus a: {$estatus}.";
                         $stmtNotif->execute([$info['id'], $info['telefono'], $estatus, $msgWa]);
                     }
-                } catch (PDOException $e) {}
+                } catch (PDOException $e) {
+                    // Ignorar si no existen las tablas auxiliares
+                }
             }
 
             echo json_encode([

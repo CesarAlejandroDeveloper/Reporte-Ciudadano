@@ -41,13 +41,16 @@
   :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   .legal { padding: 6px 16px 10px; text-align: center; color: var(--muted); font-size: .76rem; line-height: 1.35; }
   .legal p { margin: 0; }
-  #modalMapa, #modalCam { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 12px; z-index: 1000; }
-  #modalMapa[hidden], #modalCam[hidden] { display: none; }
-  #video { flex: 1; min-height: 0; width: 100%; background: #000; object-fit: contain; }
+  #modalMapa { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 12px; z-index: 1000; }
+  #modalMapa[hidden] { display: none; }
   .dialogo { width: 100%; max-width: 720px; height: min(85vh, 640px); background: var(--card); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; }
   .dialogo h2 { margin: 0; padding: 12px 16px 2px; font-size: 1.05rem; }
   .dialogo .ayuda { margin: 0; padding: 0 16px 8px; color: var(--muted); font-size: .88rem; }
   #mapaSel { flex: 1; min-height: 0; }
+  #modalCamara { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex; align-items: center; justify-content: center; padding: 12px; z-index: 1100; }
+  #modalCamara[hidden] { display: none; }
+  #modalCamara .dialogo { height: auto; max-width: 560px; }
+  #videoCam { width: 100%; max-height: 60vh; background: #000; object-fit: contain; }
   .barra { display: flex; gap: 8px; padding: 10px 14px; flex-wrap: wrap; border-top: 1px solid var(--line); }
   .barra .espacio { flex: 1; }
 </style>
@@ -75,17 +78,17 @@
 </div>
 
 <input type="file" id="foto" accept="image/jpeg,image/png,image/webp" hidden>
-<input type="file" id="fotoCam" accept="image/*" capture="environment" hidden>
+<input type="file" id="fotoCamara" accept="image/*" capture="environment" hidden>
 
-<div id="modalCam" hidden>
+<div id="modalCamara" hidden>
   <div class="dialogo" role="dialog" aria-modal="true" aria-labelledby="tCam">
-    <h2 id="tCam">Toma la foto del problema</h2>
-    <p class="ayuda" id="ayudaCam"></p>
-    <video id="video" autoplay playsinline muted></video>
+    <h2 id="tCam">Tomar foto</h2>
+    <p class="ayuda" id="ayudaCam">Permite el acceso a la cámara y encuadra el problema.</p>
+    <video id="videoCam" autoplay playsinline muted></video>
     <div class="barra">
       <span class="espacio"></span>
       <button type="button" id="btnCamCancelar">Cancelar</button>
-      <button type="button" class="main" id="btnCapturar" disabled>Tomar foto</button>
+      <button type="button" class="main" id="btnCamCapturar" disabled>Tomar foto</button>
     </div>
   </div>
 </div>
@@ -143,7 +146,9 @@
     quitaAccion();
     if (!a) return;
     const c = document.createElement('div'); c.className = 'acciones';
-    if (a === 'foto') c.append(boton('Subir foto', () => $('foto').click(), true), boton('Tomar foto con la cámara', abreCamara));
+    if (a === 'foto') c.append(
+      boton('📷 Abrir cámara', abreCamara, true),
+      boton('🖼️ Elegir foto', () => $('foto').click()));
     if (a === 'ubicacion') c.append(boton('Elegir ubicación en el mapa', abreMapa, true));
     if (a === 'confirmar') c.append(
       boton('Sí, registrar', () => enviaTexto('Sí, confirmo'), true),
@@ -190,49 +195,52 @@
     $('rapido').append(boton(q.t, () => { if (!ocupado) { pinta('me', q.t); pinta('bot', q.r); } }));
   }
 
-  /* Foto: subir desde el dispositivo o tomarla con la cámara */
-  function enviaFoto(f) { if (f && !ocupado) { pinta('me', '[Foto adjunta]'); llamar('', { foto: f }); } }
-  for (const id of ['foto', 'fotoCam']) {
-    $(id).addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; enviaFoto(f); });
+  /* Foto: elegir de la galería o tomar con la cámara */
+  function fotoElegida(e) {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f || ocupado) return;
+    pinta('me', '[Foto adjunta]'); llamar('', { foto: f });
   }
+  $('foto').addEventListener('change', fotoElegida);
+  $('fotoCamara').addEventListener('change', fotoElegida);
 
-  let flujoCam = null;
-  const cierraCamara = () => {
-    if (flujoCam) { flujoCam.getTracks().forEach(t => t.stop()); flujoCam = null; }
-    $('video').srcObject = null; $('modalCam').hidden = true;
-  };
-  function errorCamara(e) {
-    if (e && e.name === 'NotAllowedError') return 'El permiso de la cámara está bloqueado. Toca el candado junto a la dirección, permite la cámara y vuelve a intentar. También puedes cancelar y usar "Subir foto".';
-    if (e && e.name === 'NotFoundError') return 'No encontré una cámara en este dispositivo. Cancela y usa "Subir foto".';
-    if (e && e.name === 'NotReadableError') return 'La cámara está siendo usada por otra aplicación. Ciérrala e intenta de nuevo.';
-    return 'No pude abrir la cámara. Cancela y usa "Subir foto".';
+  /* Cámara: en celular usa la app de cámara del sistema (capture);
+     en computadora abre una vista previa con getUserMedia (requiere https o localhost). */
+  let streamCam = null;
+  const esTactil = window.matchMedia('(pointer: coarse)').matches;
+  function cierraCamara() {
+    if (streamCam) { streamCam.getTracks().forEach(t => t.stop()); streamCam = null; }
+    $('videoCam').srcObject = null;
+    $('modalCamara').hidden = true;
+    $('btnCamCapturar').disabled = true;
   }
   async function abreCamara() {
-    // Sin HTTPS el navegador no ofrece la cámara en vivo: se usa la app de cámara del dispositivo
-    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      nota('Este sitio no usa HTTPS, así que se abrirá la cámara del dispositivo (en computadora se abre el selector de archivos).');
-      $('fotoCam').click(); return;
-    }
-    $('modalCam').hidden = false; $('btnCapturar').disabled = true;
-    $('ayudaCam').textContent = 'Permite el acceso a la cámara cuando el navegador lo pida…';
+    if (ocupado) return;
+    const puedeStream = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    if (esTactil || !puedeStream) { $('fotoCamara').click(); return; }
     try {
-      flujoCam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-      $('video').srcObject = flujoCam;
-      $('ayudaCam').textContent = 'Encuadra el problema y toma la foto.';
-      $('btnCapturar').disabled = false;
-    } catch (e) { $('ayudaCam').textContent = errorCamara(e); }
+      streamCam = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+      $('videoCam').srcObject = streamCam;
+      $('modalCamara').hidden = false;
+      $('btnCamCapturar').disabled = false;
+    } catch (err) {
+      nota('No se pudo abrir la cámara (' + (err && err.name === 'NotAllowedError' ? 'permiso denegado' : 'no disponible') + '). Puedes elegir una foto de tu dispositivo.');
+    }
   }
   $('btnCamCancelar').addEventListener('click', cierraCamara);
-  $('btnCapturar').addEventListener('click', () => {
-    const v = $('video'); if (!v.videoWidth) return;
-    const k = Math.min(1, 1600 / Math.max(v.videoWidth, v.videoHeight));
-    const c = document.createElement('canvas');
-    c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
-    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
-    c.toBlob(b => {
+  $('btnCamCapturar').addEventListener('click', () => {
+    const v = $('videoCam');
+    if (!v.videoWidth) return;
+    const cv = document.createElement('canvas');
+    cv.width = v.videoWidth; cv.height = v.videoHeight;
+    cv.getContext('2d').drawImage(v, 0, 0);
+    cv.toBlob(blob => {
       cierraCamara();
-      if (b) enviaFoto(new File([b], 'foto.jpg', { type: 'image/jpeg' }));
-    }, 'image/jpeg', 0.85);
+      if (!blob || ocupado) return;
+      const f = new File([blob], 'camara_' + Date.now() + '.jpg', { type: 'image/jpeg' });
+      pinta('me', '[Foto adjunta]'); llamar('', { foto: f });
+    }, 'image/jpeg', 0.9);
   });
 
   /* Mapa para elegir ubicación */
@@ -261,29 +269,14 @@
   }
   const cierraMapa = () => { $('modalMapa').hidden = true; };
   $('btnCancelar').addEventListener('click', cierraMapa);
-  function errorUbic(e) {
-    const det = ' [código ' + e.code + (e.message ? ': ' + e.message : '') + ']';
-    return errorUbicTexto(e) + det;
-  }
-  function errorUbicTexto(e) {
-    if (e.code === 1) return 'El permiso de ubicación está bloqueado. Toca el candado junto a la dirección, permite "Ubicación" y vuelve a intentar. En Windows revisa también que la ubicación esté activada en Configuración > Privacidad. Mientras tanto, toca el mapa para elegir el punto.';
-    if (e.code === 2) return 'No pude determinar tu ubicación (sin señal o ubicación desactivada en el equipo). Toca el mapa para elegirla.';
-    return 'La ubicación tardó demasiado en responder. Intenta de nuevo o toca el mapa para elegirla.';
-  }
   $('btnActual').addEventListener('click', () => {
     const ayuda = $('ayudaMapa');
-    if (!window.isSecureContext) {
-      ayuda.textContent = 'El navegador bloquea la ubicación en sitios sin HTTPS. Abre la página con https:// (o con localhost) o toca el mapa para elegir el punto.'; return;
-    }
     if (!navigator.geolocation) { ayuda.textContent = 'Tu navegador no permite obtener la ubicación. Toca el mapa para elegirla.'; return; }
     ayuda.textContent = 'Permite el acceso a tu ubicación cuando el navegador lo pida…';
-    const ok = p => { colocaPin([p.coords.latitude, p.coords.longitude], 17); ayuda.textContent = 'Esta es tu ubicación actual. Arrastra el pin si necesitas ajustarlo y confirma.'; };
-    navigator.geolocation.getCurrentPosition(ok, e => {
-      if (e.code === 1) { ayuda.textContent = errorUbic(e); return; }
-      // Sin GPS preciso: reintenta con ubicación aproximada (Wi-Fi / red)
-      navigator.geolocation.getCurrentPosition(ok, e2 => { ayuda.textContent = errorUbic(e2); },
-        { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
-    }, { enableHighAccuracy: true, timeout: 8000 });
+    navigator.geolocation.getCurrentPosition(
+      p => { colocaPin([p.coords.latitude, p.coords.longitude], 17); ayuda.textContent = 'Esta es tu ubicación actual. Arrastra el pin si necesitas ajustarlo y confirma.'; },
+      () => { ayuda.textContent = 'No pude obtener tu ubicación. Revisa los permisos o toca el mapa para elegirla.'; },
+      { enableHighAccuracy: true, timeout: 10000 });
   });
   $('btnConfirmarUbic').addEventListener('click', () => {
     if (!pin) return;
