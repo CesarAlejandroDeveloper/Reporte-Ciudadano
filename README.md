@@ -106,5 +106,5 @@ En cumplimiento con las buenas prácticas de desarrollo de software y transparen
 
 ## Equipo de Desarrollo
 
-* **Autor(es):** *[Agrega aquí los nombres de los integrantes del equipo]*
-* **Ubicación:** Heroica Veracruz, Veracruz, México.
+* **Autor(es):** *Barragan Diaz Cesar Alejandro, Escamilla De La Hoz Alberto, Valera Galicia Osvaldo, Rico Balderas Ezequiel, Gonzales Castro Eduardo*
+* **Ubicación:** Veracruz, Veracruz, México.
