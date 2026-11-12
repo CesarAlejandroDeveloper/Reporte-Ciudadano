@@ -1,67 +1,105 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CiudadReporta</title>
-    <style>
-      :root {
-        --bg: #f4f7fb;
-        --panel: #ffffff;
-        --primary: #1f6feb;
-        --text: #1f2937;
-        --muted: #6b7280;
-        --border: #e5e7eb;
-      }
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CiudadReporta - Gobierno del Estado de Veracruz</title>
+  
+  <link rel="stylesheet" href="../CSS/styles.css">
+  
+  <style>
+    /* --- ESTILOS DEL HEADER INSTITUCIONAL --- */
+    .header-oficial {
+      background-color: #ffffff;
+      padding: 15px 5%;
+      display: flex;
+      justify-content: center; /* Centramos los logos al no haber elementos a la derecha */
+      align-items: center;
+      flex-wrap: wrap; 
+    }
+    
+    .logos-contenedor {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
 
-      * { box-sizing: border-box; }
+    .logo-img {
+      height: 60px; 
+      object-fit: contain;
+    }
 
-      body {
-        margin: 0;
-        font-family: Arial, Helvetica, sans-serif;
-        background: linear-gradient(135deg, #eef4ff, var(--bg));
-        color: var(--text);
-      }
+    /* --- LÍNEA DE COLORES OFICIAL --- */
+    .linea-colores {
+      height: 6px;
+      width: 100%;
+      /* Degradado usando el Guinda y Dorado oficiales */
+      background: linear-gradient(to right, #75203D 0%, #C9A15B 50%, #75203D 100%);
+    }
 
-      .container {
-        max-width: 960px;
-        margin: 60px auto;
-        padding: 32px;
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        box-shadow: 0 12px 30px rgba(31, 111, 235, 0.08);
-      }
+    /* --- ESTILOS DEL PANEL CENTRAL --- */
+    .pantalla-inicio {
+      max-width: 800px;
+      margin: 60px auto; 
+      text-align: center;
+      padding: 60px 40px;
+    }
+    
+    .pantalla-inicio h1 {
+      font-size: 2.8rem;
+      color: var(--primary); 
+      margin-bottom: 20px;
+    }
+    
+    .pantalla-inicio p {
+      font-size: 1.1rem;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 40px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
 
-      h1 {
-        margin: 0 0 16px;
-        font-size: 2.2rem;
-        color: var(--primary);
-      }
+    .btn-inicio {
+      width: auto;
+      padding: 16px 45px;
+      font-size: 1.1rem;
+      text-decoration: none;
+      display: inline-block;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
 
-      p {
-        font-size: 1rem;
-        line-height: 1.7;
-        color: var(--muted);
+    @media (max-width: 768px) {
+      .pantalla-inicio {
+        margin: 30px 15px;
+        padding: 40px 20px;
       }
+    }
+  </style>
+</head>
+<body>
 
-      .btn {
-        display: inline-block;
-        margin-top: 18px;
-        padding: 12px 20px;
-        background: var(--primary);
-        color: #fff;
-        text-decoration: none;
-        border-radius: 10px;
-        font-weight: 600;
-      }
-    </style>
-  </head>
-  <body>
-    <main class="container">
-      <h1>CiudadReporta</h1>
-      <p>Bienvenido a la plataforma de reportes ciudadanos. Aquí puedes compartir incidencias, comunicar problemas y contribuir a una ciudad más segura y ordenada.</p>
-      <a class="btn" href="#">Iniciar</a>
-    </main>
-  </body>
+  <!-- ENCABEZADO CON LOGOS -->
+  <header class="header-oficial">
+    <div class="logos-contenedor">
+      <img src="../IMG/loco (1) (1).png" alt="Gobierno del Estado de Veracruz" class="logo-img">
+      <img src="../IMG/amor-veracruz.png" alt="Por amor a Veracruz" class="logo-img">
+    </div>
+  </header>
+
+  <!-- LÍNEA DE COLORES -->
+  <div class="linea-colores"></div>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="panel pantalla-inicio">
+    <h1>CiudadReporta</h1>
+    <p>Bienvenido a la plataforma de reportes ciudadanos de Obras Públicas. Aquí puedes compartir incidencias, comunicar problemas y contribuir a una ciudad más segura y ordenada.</p>
+    
+    <!-- Botón que dirige al formulario -->
+    <a class="btn btn-inicio" href="Pagina.php">Hacer un reporte</a>
+  </main>
+
+</body>
 </html>
