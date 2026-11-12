@@ -1,8 +1,12 @@
+<!-- Documento puente de seguridad: evita el acceso estático sin pasar por el filtro de sesión PHP -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
+  <!-- Codificación UTF-8 estándar -->
   <meta charset="UTF-8" />
+  <!-- Redirección inmediata a nivel HTML hacia index.php (donde se valida $_SESSION) -->
   <meta http-equiv="refresh" content="0;url=index.php" />
+  <!-- Redirección inmediata por JavaScript sin dejar historial de navegación -->
   <script>window.location.replace('index.php');</script>
 </head>
 <body></body>

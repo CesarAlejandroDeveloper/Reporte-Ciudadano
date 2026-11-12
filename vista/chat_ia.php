@@ -1,10 +1,10 @@
-<!-- Burbuja flotante de Asistente IA (Respondin) -->
+<!-- Burbuja flotante de Asistente IA (Respondin) con Mapa y Geocodificación Automática -->
 <style>
   #iaFabBtn.ia-fab {
     position: fixed !important;
-    right: 18px !important;
-    bottom: 18px !important;
-    z-index: 2147483645 !important;
+    right: 20px !important;
+    bottom: 20px !important;
+    z-index: 99998 !important;
     display: inline-flex !important;
     align-items: center !important;
     gap: 10px !important;
@@ -18,8 +18,11 @@
     font-weight: 700 !important;
     cursor: pointer !important;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.28) !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+    transition: transform 0.18s ease, box-shadow 0.18s ease !important;
+  }
+  #iaFabBtn.ia-fab:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34) !important;
   }
   .ia-fab-dot {
     width: 10px;
@@ -32,27 +35,24 @@
 
   #iaVentanaChat.ia-ventana {
     position: fixed !important;
-    right: 18px !important;
-    bottom: 80px !important;
+    right: 20px !important;
+    bottom: 82px !important;
     width: 380px !important;
     max-width: calc(100vw - 24px) !important;
-    height: 520px !important;
+    height: 530px !important;
     max-height: calc(100vh - 105px) !important;
     background: #ffffff !important;
     border: 1px solid #d1d5db !important;
     border-radius: 16px !important;
-    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.34) !important;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.32) !important;
     display: none !important;
     flex-direction: column !important;
     overflow: hidden !important;
-    z-index: 2147483647 !important;
+    z-index: 99999 !important;
     font-family: "Segoe UI", system-ui, sans-serif !important;
   }
   #iaVentanaChat.ia-ventana.abierta {
     display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
   }
 
   .ia-header {
@@ -90,6 +90,9 @@
     font-size: 0.85rem;
     font-weight: 700;
     cursor: pointer;
+  }
+  .ia-btn-head:hover {
+    background: rgba(255, 255, 255, 0.3);
   }
 
   .ia-terminos {
@@ -160,6 +163,7 @@
     text-align: center;
   }
 
+  /* Panel de Mini-Mapa dentro del Chat */
   .ia-mapa-overlay {
     display: none;
     flex-direction: column;
@@ -183,7 +187,7 @@
   }
   #iaMiniMapa {
     width: 100%;
-    height: 170px;
+    height: 175px;
     border-radius: 10px;
     border: 1px solid #d1d5db;
     background: #eef2f6;
@@ -238,6 +242,10 @@
     font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
+  }
+  .ia-chip:hover:not(:disabled) {
+    border-color: var(--primary, #691c32);
+    color: var(--primary, #691c32);
   }
   .ia-chip:disabled {
     opacity: 0.5;
@@ -306,7 +314,7 @@
       left: 10px !important;
       bottom: 68px !important;
       width: auto !important;
-      height: 75vh !important;
+      height: 76vh !important;
     }
   }
 </style>
@@ -337,6 +345,7 @@
 
   <div class="ia-mensajes" id="iaLogMensajes" aria-live="polite"></div>
 
+  <!-- Mini-Mapa Interactivo -->
   <div class="ia-mapa-overlay" id="iaMapaPanel">
     <div class="ia-mapa-top">
       <span>📍 Toca el mapa o mueve el pin</span>
@@ -358,8 +367,8 @@
 
   <form class="ia-form" id="iaFormChat" autocomplete="off">
     <button type="button" class="ia-btn-extra" id="iaBtnGps" title="Elegir ubicación en el mapa" disabled>📍</button>
-    <button type="button" class="ia-btn-extra" id="iaBtnFoto" title="Adjuntar foto" disabled>📷</button>
-    <input type="file" id="iaInputFoto" accept="image/*" style="display:none;" />
+    <button type="button" class="ia-btn-extra" id="iaBtnFoto" title="Adjuntar foto (JPG/PNG/WEBP)" disabled>📷</button>
+    <input type="file" id="iaInputFoto" accept="image/jpeg,image/png,image/webp" style="display:none;" />
     <input type="text" class="ia-input" id="iaInputTexto" placeholder="Escribe tu duda o dirección..." maxlength="1000" disabled />
     <button type="submit" class="ia-btn-enviar" id="iaBtnEnviar" disabled>Enviar</button>
   </form>
@@ -392,34 +401,6 @@
   const btnCerrarMapa = document.getElementById('iaBtnCerrarMapa');
 
   if (!fab || !ventana) return;
-
-  // Asegurar que la ventana sea hija directa de <body> para evitar recortes por contenedores padre
-  if (ventana.parentElement !== document.body) {
-    document.body.appendChild(ventana);
-  }
-  if (fab.parentElement !== document.body) {
-    document.body.appendChild(fab);
-  }
-
-  function alternarVentanaIA(forzarEstado) {
-    const abrir = typeof forzarEstado === 'boolean'
-      ? forzarEstado
-      : !ventana.classList.contains('abierta');
-
-    if (abrir) {
-      ventana.classList.add('abierta');
-      ventana.style.setProperty('display', 'flex', 'important');
-      ventana.style.setProperty('visibility', 'visible', 'important');
-      ventana.style.setProperty('opacity', '1', 'important');
-      ventana.style.setProperty('z-index', '2147483647', 'important');
-      if (checkTerminos && checkTerminos.checked && inputTexto) {
-        inputTexto.focus();
-      }
-    } else {
-      ventana.classList.remove('abierta');
-      ventana.style.setProperty('display', 'none', 'important');
-    }
-  }
 
   let sessionId = sessionStorage.getItem('respondin_sid') || '';
   let esperandoUbicacion = sessionStorage.getItem('respondin_wait_loc') === '1';
@@ -463,6 +444,7 @@
     return false;
   }
 
+  // Convierte coordenadas escritas o una dirección escrita en lat/lng para que chatbot.php no se cicle
   async function resolverUbicacionDesdeTexto(texto) {
     const matchCoords = texto.match(/(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/);
     if (matchCoords) {
@@ -486,7 +468,9 @@
           return { latitude: lat, longitude: lng };
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Si no hay salida a internet, usa el centro de Veracruz como respaldo
+    }
 
     return { latitude: 19.1738, longitude: -96.1348 };
   }
@@ -581,6 +565,19 @@
     }
 
     setTimeout(() => { if (miniMapa) miniMapa.resize(); }, 150);
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => actualizarPinTemporal(pos.coords.latitude, pos.coords.longitude, true),
+        () => {
+          mapaEstado.style.color = '#4b5563';
+          mapaEstado.textContent = 'Toca el mapa o arrastra el marcador rojo al lugar del problema.';
+        },
+        { enableHighAccuracy: true, timeout: 6000 }
+      );
+    } else {
+      mapaEstado.textContent = 'Toca el mapa o arrastra el marcador rojo al lugar del problema.';
+    }
   }
 
   function guardarHistorialVisual() {
@@ -657,6 +654,7 @@
     habilitarControles(false);
     const escribiendo = agregarBurbuja('bot', 'Escribiendo...', '', false);
 
+    // Si el chat pidió ubicación y el usuario escribió dirección o coordenadas en texto, las resolvemos
     if (!coords && mensaje) {
       const tieneCoordsEscritas = /(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/.test(mensaje);
       if (tieneCoordsEscritas || esperandoUbicacion) {
@@ -700,6 +698,7 @@
       const textoRespuesta = (data.respuesta || data.error || 'Sin respuesta')
         + (data.respuesta && data.error ? `\n[Detalle: ${data.error}]` : '');
 
+      // Detectar si el asistente está pidiendo la ubicación
       const lowerResp = textoRespuesta.toLowerCase();
       if (
         lowerResp.includes('dónde está el problema') ||
@@ -738,12 +737,15 @@
   fab.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    alternarVentanaIA();
+    ventana.classList.toggle('abierta');
+    if (ventana.classList.contains('abierta') && checkTerminos.checked) {
+      inputTexto.focus();
+    }
   });
 
   btnCerrar.addEventListener('click', (e) => {
     e.preventDefault();
-    alternarVentanaIA(false);
+    ventana.classList.remove('abierta');
   });
 
   btnReiniciar.addEventListener('click', () => {
@@ -818,16 +820,18 @@
     mapaPanel.classList.remove('visible');
   });
 
-  btnFoto.addEventListener('click', () => {
-    inputFoto.value = '';
-    inputFoto.click();
-  });
+  btnFoto.addEventListener('click', () => inputFoto.click());
 
   inputFoto.addEventListener('change', (e) => {
     const f = e.target.files[0];
     if (!f) return;
-    if (f.size > 8 * 1024 * 1024) {
-      alert('La imagen para el chat no debe superar los 8 MB.');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) {
+      alert('Solo se permiten imágenes JPG, PNG o WEBP.');
+      inputFoto.value = '';
+      return;
+    }
+    if (f.size > 5 * 1024 * 1024) {
+      alert('La imagen para el chat no debe superar los 5 MB.');
       inputFoto.value = '';
       return;
     }

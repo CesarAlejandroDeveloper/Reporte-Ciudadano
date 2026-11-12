@@ -1,8 +1,13 @@
 <?php
+// ============================================================================
+// SECCIÓN 1: PROTECCIÓN DE ACCESO MEDIANTE SESIÓN PHP
+// ============================================================================
+// Inicia o reanuda la sesión del usuario en el servidor
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Comprueba si existe una sesión autenticada de personal administrativo
 $sesionValida = !empty($_SESSION['usuario'])
     || !empty($_SESSION['usuario_id'])
     || !empty($_SESSION['user_id'])
@@ -12,49 +17,71 @@ $sesionValida = !empty($_SESSION['usuario'])
     || !empty($_SESSION['user'])
     || !empty($_SESSION['logueado']);
 
+// Si el usuario no ha iniciado sesión, bloquea la vista y lo redirige al inicio
 if (!$sesionValida) {
     http_response_code(403);
     header('Location: ../../vista/Home.php?error=acceso_denegado');
     exit;
 }
 ?>
+<!-- ======================================================================== -->
+<!-- SECCIÓN 2: ESTRUCTURA HTML Y DEPENDENCIAS DE LEAFLET / PROTOMAPS         -->
+<!-- ======================================================================== -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mapa de calor · Reportes ciudadanos</title>
+<!-- Hoja de estilos y biblioteca base de Leaflet -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
-<!-- Misma librería que api/mapa: copia local si existe, si no, internet -->
+<!-- Carga Protomaps local para mapas vectoriales sin internet; si falla, usa CDN -->
 <script src="../mapa/protomaps-leaflet.js"></script>
 <script>window.protomapsL || document.write('<script src="https://unpkg.com/protomaps-leaflet@5.0.0/dist/protomaps-leaflet.js"><\/script>')</script>
+
+<!-- ======================================================================== -->
+<!-- SECCIÓN 3: ESTILOS DEL PANEL LATERAL Y LEYENDA DE SEVERIDAD              -->
+<!-- ======================================================================== -->
 <style>
+  /* Paleta de colores institucionales y variables de diseño */
   :root { --ink:#1d2430; --muted:#5f6b7a; --bg:#f3f1ee; --line:#d9d4cc; --brand:#1d4f91; }
+  /* Modelo de caja uniforme */
   * { box-sizing: border-box; }
+  /* Ocupa el 100% del alto de la ventana sin barras de desplazamiento globales */
   html, body { height: 100%; margin: 0; }
+  /* Disposición flexible horizontal: mapa a la izquierda, panel de control a la derecha */
   body { font: 15px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--ink); display: flex; }
+  /* Contenedor principal del mapa interactivo */
   #mapa { flex: 1; min-width: 0; height: 100%; }
+  /* Barra lateral fija de 360px con scroll independiente */
   aside { width: 360px; max-width: 100%; height: 100%; overflow-y: auto; background: var(--bg); border-left: 1px solid var(--line); padding: 16px; }
+  /* Tipografía de títulos y párrafos */
   h1 { font-size: 1.2rem; margin: 0 0 2px; }
   h2 { font-size: 1rem; margin: 18px 0 8px; }
   p { margin: 0; }
   .muted { color: var(--muted); font-size: .88rem; }
+  /* Cuadrícula de niveles de densidad (Grave, Notable, Moderado, Sin nivel) */
   .niveles { display: grid; gap: 6px; margin-top: 12px; }
   .nivel { display: flex; align-items: center; gap: 10px; }
   .chip { width: 14px; height: 14px; border-radius: 4px; flex: none; }
   .nivel b { min-width: 70px; }
+  /* Controles de radio de búsqueda y botón de simulación */
   .acciones { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
   button { font: inherit; cursor: pointer; padding: 7px 11px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
   button.on { background: var(--brand); color: #fff; border-color: var(--brand); }
   input[type=number] { width: 64px; font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 8px; }
+  /* Mensajes informativos y alertas de error */
   .aviso { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: #fff4d6; border: 1px solid #ecd48a; font-size: .88rem; }
   .error { background: #fde4e1; border-color: #e9a59e; }
+  /* Tarjeta de cada reporte encontrado dentro del radio de clic */
   .rep { background: #fff; border: 1px solid var(--line); border-left-width: 6px; border-radius: 8px; padding: 9px 11px; margin-bottom: 8px; }
   .rep b { display: block; }
   .rep small { color: var(--muted); display: block; }
   .rep p { margin-top: 4px; font-size: .9rem; }
+  /* Indicador accesible de foco para navegación con teclado */
   button:focus-visible, input:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+  /* Adaptación vertical para pantallas pequeñas */
   @media (max-width: 760px) {
     body { flex-direction: column; }
     #mapa { height: 55%; flex: none; }
@@ -63,7 +90,10 @@ if (!$sesionValida) {
 </style>
 </head>
 <body>
+<!-- Lienzo del mapa -->
 <div id="mapa"></div>
+
+<!-- Panel lateral con leyenda, controles y resultados de inspección -->
 <aside aria-live="polite">
   <h1>Mapa de calor de reportes</h1>
   <p class="muted" id="resumen">Cargando reportes…</p>
@@ -77,28 +107,40 @@ if (!$sesionValida) {
   <h2 id="tituloLista">Haz clic en el mapa</h2>
   <div id="lista"><p class="muted">Se mostrarán los reportes que estén dentro del radio elegido alrededor del punto donde hagas clic.</p></div>
 </aside>
+
+<!-- ======================================================================== -->
+<!-- SECCIÓN 4: MOTOR DE AGRUPACIÓN POR ZONAS Y CÁLCULO DE DISTANCIAS         -->
+<!-- ======================================================================== -->
 <script>
+// Parámetros generales de cuadrícula, actualización y umbrales de criticidad
 const CFG = {
-  ZONA_M: 300,                 // tamaño de cada zona (cuadro) en metros
-  RADIO_M: 5,                  // radio por defecto del clic
-  SEGUNDOS: 30,                // cada cuánto se recargan los reportes (0 = nunca)
-  CENTRO: [19.1738, -96.1348],
-  LIMITES: [[17.1, -98.7], [22.5, -93.6]],
-  ARCHIVO_MAPA: '../mapa/veracruz.pmtiles',
-  API: 'datos.php',
-  NIVELES: [                   // de mayor a menor
+  ZONA_M: 300,                 // Tamaño de cada celda cuadrada en metros (300m x 300m)
+  RADIO_M: 5,                  // Radio de búsqueda inicial en metros al hacer clic
+  SEGUNDOS: 30,                // Intervalo de auto-recarga en segundos
+  CENTRO: [19.1738, -96.1348], // Coordenadas centrales de Veracruz
+  LIMITES: [[17.1, -98.7], [22.5, -93.6]], // Límites geográficos del estado de Veracruz
+  ARCHIVO_MAPA: '../mapa/veracruz.pmtiles', // Mapa base local offline
+  API: 'datos.php',            // Endpoint protegido de datos
+  NIVELES: [                   // Clasificación de densidad de mayor a menor
     { min: 50, nombre: 'Grave',    color: '#d62839' },
     { min: 20, nombre: 'Notable',  color: '#f57c00' },
     { min: 10, nombre: 'Moderado', color: '#f4b400' }
   ],
   SIN_NIVEL: { nombre: 'Sin nivel', color: '#64748b' }
 };
+
+// Atajo para seleccionar elementos del DOM por ID
 const $ = id => document.getElementById(id);
+// Factores de conversión de grados a metros en la latitud de Veracruz
 const M_LAT = 111320, M_LNG = M_LAT * Math.cos(CFG.CENTRO[0] * Math.PI / 180);
+// Determina el nivel de criticidad según la cantidad de reportes en la celda
 const nivelDe = n => CFG.NIVELES.find(x => n >= x.min) || null;
+// Convierte coordenadas (lat, lng) en índices enteros de celda de cuadrícula
 const celda = (lat, lng) => [Math.floor(lat * M_LAT / CFG.ZONA_M), Math.floor(lng * M_LNG / CFG.ZONA_M)];
+// Genera la llave única de texto para identificar una celda en el Map
 const clave = (cy, cx) => cy + ':' + cx;
 
+// Calcula la distancia exacta en metros entre dos coordenadas usando la fórmula de Haversine
 function metros(lat1, lng1, lat2, lng2) {
   const r = Math.PI / 180, R = 6371008.8;
   const a = Math.sin((lat2 - lat1) * r / 2) ** 2 +
@@ -106,6 +148,7 @@ function metros(lat1, lng1, lat2, lng2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+// Helper para crear nodos DOM limpios y seguros con textContent
 function el(tag, cls, txt) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -113,9 +156,11 @@ function el(tag, cls, txt) {
   return e;
 }
 
+// Inicializa el mapa Leaflet restringido a los límites de Veracruz
 const mapa = L.map('mapa', { minZoom: 7, maxZoom: 19, maxBounds: CFG.LIMITES, maxBoundsViscosity: 1, preferCanvas: true })
   .setView(CFG.CENTRO, 13);
 
+// Usa el archivo local .pmtiles si Protomaps está disponible; si no, carga OpenStreetMap online
 if (window.protomapsL) {
   protomapsL.leafletLayer({
     url: CFG.ARCHIVO_MAPA,
@@ -128,15 +173,19 @@ if (window.protomapsL) {
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mapa);
 }
 
+// Capas independientes para cuadros de calor, puntos individuales y círculo de selección
 const capaZonas = L.layerGroup().addTo(mapa);
 const capaPuntos = L.layerGroup().addTo(mapa);
 const capaClic = L.layerGroup().addTo(mapa);
 
+// Estado en memoria de reportes y zonas calculadas
 let reportes = [], zonas = new Map(), demo = false, primeraVez = true;
 
+// Agrupa los reportes en celdas de 300m x 300m y dibuja los rectángulos y marcadores
 function construir(lista) {
   reportes = lista;
   zonas = new Map();
+  // Contabiliza cuántos reportes caen dentro de cada celda
   for (const r of reportes) {
     const [cy, cx] = celda(r.lat, r.lng);
     r._k = clave(cy, cx);
@@ -144,9 +193,11 @@ function construir(lista) {
     z.n++;
     zonas.set(r._k, z);
   }
+  // Asigna el nivel de color (Grave, Notable, Moderado o null) a cada celda
   for (const z of zonas.values()) z.nivel = nivelDe(z.n);
   capaZonas.clearLayers();
   capaPuntos.clearLayers();
+  // Dibuja los cuadrantes coloreados para zonas que superan el umbral mínimo
   for (const z of zonas.values()) {
     if (!z.nivel) continue;
     L.rectangle(
@@ -155,6 +206,7 @@ function construir(lista) {
       { color: z.nivel.color, weight: 1, fillColor: z.nivel.color, fillOpacity: 0.38, interactive: false }
     ).addTo(capaZonas);
   }
+  // Dibuja un círculo pequeño en la ubicación exacta de cada reporte
   for (const r of reportes) {
     const c = (zonas.get(r._k).nivel || CFG.SIN_NIVEL).color;
     L.circleMarker([r.lat, r.lng], { radius: 4, color: '#fff', weight: 1, fillColor: c, fillOpacity: 1, interactive: false }).addTo(capaPuntos);
@@ -162,6 +214,7 @@ function construir(lista) {
   pintarNiveles();
 }
 
+// Actualiza la leyenda lateral con el conteo de zonas activas por cada nivel
 function pintarNiveles() {
   const cont = $('niveles');
   cont.replaceChildren();
@@ -179,11 +232,13 @@ function pintarNiveles() {
   cont.append(f);
 }
 
+// Muestra u oculta banners de aviso o error en el panel derecho
 function avisar(txt, error) {
   $('avisos').replaceChildren();
   if (txt) $('avisos').append(el('div', 'aviso' + (error ? ' error' : ''), txt));
 }
 
+// Descarga los reportes reales desde datos.php y actualiza el mapa
 async function cargar() {
   if (demo) return;
   try {
@@ -195,6 +250,7 @@ async function cargar() {
     avisar(d.con_ubicacion === 0
       ? 'Todavía no hay reportes con ubicación. Usa "Ver datos de prueba" para ver cómo se verá el mapa.'
       : (d.con_ubicacion < d.total ? 'Los reportes sin latitud y longitud no pueden dibujarse en el mapa.' : ''));
+    // Centra el zoom automáticamente sobre los reportes la primera vez que carga
     if (primeraVez && reportes.length) {
       mapa.fitBounds(L.latLngBounds(reportes.map(r => [r.lat, r.lng])), { maxZoom: 16, padding: [40, 40] });
     }
@@ -205,6 +261,7 @@ async function cargar() {
   }
 }
 
+// Genera datos simulados deterministas para demostración sin alterar la base de datos
 function generarDemo() {
   let s = 7;
   const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -235,6 +292,7 @@ function generarDemo() {
   return out;
 }
 
+// Alterna entre los datos reales de MySQL y los datos simulados de prueba
 $('btnDemo').addEventListener('click', () => {
   demo = !demo;
   $('btnDemo').classList.toggle('on', demo);
@@ -251,12 +309,16 @@ $('btnDemo').addEventListener('click', () => {
   }
 });
 
+// Filtra y enlista los reportes ubicados dentro del radio (en metros) donde el operador hizo clic
 mapa.on('click', e => {
   const R = Math.max(1, Math.min(500, +$('radio').value || CFG.RADIO_M));
   const { lat, lng } = e.latlng;
   capaClic.clearLayers();
+  // Dibuja el círculo visual del radio de búsqueda y su punto central
   L.circle(e.latlng, { radius: R, color: '#1d4f91', weight: 2, fillOpacity: 0.15, interactive: false }).addTo(capaClic);
   L.circleMarker(e.latlng, { radius: 3, color: '#1d4f91', fillColor: '#1d4f91', fillOpacity: 1, interactive: false }).addTo(capaClic);
+
+  // Calcula distancias y ordena del reporte más cercano al más lejano
   const cerca = reportes.map(r => ({ r, d: metros(lat, lng, r.lat, r.lng) })).filter(x => x.d <= R).sort((a, b) => a.d - b.d);
   const [cy, cx] = celda(lat, lng), z = zonas.get(clave(cy, cx));
   const lista = $('lista');
@@ -266,12 +328,16 @@ mapa.on('click', e => {
                  : 'No hay reportes en esta zona de ' + CFG.ZONA_M + ' m.';
   lista.append(el('p', 'muted', info));
   lista.lastChild.style.marginBottom = '10px';
+
+  // Si no hay reportes dentro del radio, indica a cuántos metros está el más próximo
   if (!cerca.length) {
     const m = reportes.length ? reportes.reduce((a, r) => Math.min(a, metros(lat, lng, r.lat, r.lng)), Infinity) : null;
     lista.append(el('p', 'muted', m === null ? 'No hay reportes cargados.'
       : 'Ninguno en este radio. El más cercano está a ' + Math.round(m) + ' m; prueba con un radio mayor.'));
     return;
   }
+
+  // Renderiza la tarjeta de cada reporte encontrado dentro del radio
   for (const { r, d } of cerca) {
     const nivel = zonas.get(r._k).nivel || CFG.SIN_NIVEL;
     const t = el('div', 'rep');
@@ -287,6 +353,7 @@ mapa.on('click', e => {
   }
 });
 
+// Ejecución inicial al abrir la vista y programación de actualización automática
 pintarNiveles();
 cargar();
 if (CFG.SEGUNDOS > 0) setInterval(cargar, CFG.SEGUNDOS * 1000);

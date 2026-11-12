@@ -1,2 +1,5 @@
+# Fuerza a Apache a cargar index.php (con validación de sesión) antes que index.html al entrar a la carpeta
 DirectoryIndex index.php
+
+# Deshabilita el listado público de archivos del directorio para evitar que se explore su contenido
 Options -Indexes
